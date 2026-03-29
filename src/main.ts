@@ -10,13 +10,21 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  const frontendOrigins = process.env.FRONTEND_ORIGIN?.split(',')
-    .map((o) => o.trim())
-    .filter(Boolean);
+  const rawOrigins = process.env.FRONTEND_ORIGIN;
+  const frontendOrigins = rawOrigins
+    ? rawOrigins
+        .split(',')
+        .map((o) => o.trim().replace(/\/+$/, ''))
+        .filter(Boolean)
+    : [];
+  const defaultDevOrigins = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+  ];
   app.enableCors({
-    origin: frontendOrigins?.length
+    origin: frontendOrigins.length
       ? frontendOrigins
-      : ['http://localhost:5173'],
+      : defaultDevOrigins,
     credentials: true,
   });
 
