@@ -1,3 +1,20 @@
+/**
+ * Parse a coordinate that may be stored as number or string in JSONB.
+ * Returns null if missing or not finite.
+ */
+export function parseWgs84Coordinate(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value);
+    if (Number.isFinite(n)) {
+      return n;
+    }
+  }
+  return null;
+}
+
 /** Great-circle distance in kilometres (WGS84). */
 export function haversineDistanceKm(
   lat1: number,

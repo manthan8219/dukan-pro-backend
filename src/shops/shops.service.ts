@@ -12,7 +12,7 @@ import { CreateShopDto } from './dto/create-shop.dto';
 import { ShopNearbySummaryDto } from './dto/shop-nearby-summary.dto';
 import { UpdateShopDto } from './dto/update-shop.dto';
 import { Shop } from './entities/shop.entity';
-import { haversineDistanceKm } from './geo.util';
+import { haversineDistanceKm, parseWgs84Coordinate } from './geo.util';
 import type { ShopOffering } from './types/shop-offering.types';
 
 @Injectable()
@@ -66,8 +66,15 @@ export class ShopsService {
   }
 
   /**
-   * Shops that can deliver to (latitude, longitude) at the given order value,
-   * using the same tier logic as GET /shops/:shopId/delivery-radius-rules/effective.
+   * Shops that can deliver to (latitude, longitude) at the given order value.
+   *
+   * Logic:
+   * 1. Load active shops and their optional radius tiers (min order ₹ → max km).
+   * 2. For each shop with a valid map pin, compute great-circle distance (haversine) from the
+   *    query point to the shop pin (km).
+   * 3. Effective max radius = best tier for `orderAmountRupees`, else shop default `serviceRadiusKm`.
+   * 4. Include shop iff distance ≤ effective max radius (with a tiny epsilon for float noise).
+   * 5. Sort by distance ascending.
    */
   async findDeliverableNearby(
     latitude: number,
@@ -90,14 +97,9 @@ export class ShopsService {
 
     const out: ShopNearbySummaryDto[] = [];
     for (const shop of shops) {
-      const slat = shop.location.coordinates.latitude;
-      const slng = shop.location.coordinates.longitude;
-      if (
-        slat == null ||
-        slng == null ||
-        !Number.isFinite(slat) ||
-        !Number.isFinite(slng)
-      ) {
+      const slat = parseWgs84Coordinate(shop.location?.coordinates?.latitude);
+      const slng = parseWgs84Coordinate(shop.location?.coordinates?.longitude);
+      if (slat == null || slng == null) {
         continue;
       }
 
@@ -107,8 +109,13 @@ export class ShopsService {
         minOrderAmount: Number(r.minOrderAmount),
         maxServiceRadiusKm: r.maxServiceRadiusKm,
       }));
+      const defaultRadiusParsed = Number(shop.offering?.serviceRadiusKm);
+      const shopDefaultRadiusKm =
+        Number.isFinite(defaultRadiusParsed) && defaultRadiusParsed >= 0
+          ? defaultRadiusParsed
+          : 0;
       const effectiveMaxServiceRadiusKm = effectiveMaxServiceRadiusKmForOrder({
-        shopDefaultRadiusKm: shop.offering.serviceRadiusKm,
+        shopDefaultRadiusKm,
         rules: ruleInputs,
         orderAmountRupees,
       });
