@@ -47,4 +47,14 @@ export class UpdateProductDto {
   @IsString({ each: true })
   @MaxLength(100, { each: true })
   searchTerms?: string[] | null;
+
+  @ApiPropertyOptional({
+    description: 'Set or clear catalog barcode (null to remove)',
+    nullable: true,
+  })
+  @IsOptional()
+  @ValidateIf((o: UpdateProductDto) => o.barcode != null)
+  @IsString()
+  @MaxLength(32)
+  barcode?: string | null;
 }

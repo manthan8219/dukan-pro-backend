@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -19,6 +20,8 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { normalizeBarcode } from './barcode.util';
+import { BarcodeResolveResponseDto } from './dto/barcode-resolve-response.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { SearchProductsQueryDto } from './dto/search-products-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -52,6 +55,24 @@ export class ProductsController {
       return Promise.resolve([]);
     }
     return this.productsService.searchByNameSubstring(query.q, limit);
+  }
+
+  @Get('resolve-barcode')
+  @ApiOperation({
+    summary:
+      'Resolve barcode: existing catalog row, else Open Food Facts (creates catalog product), else unknown',
+  })
+  @ApiOkResponse({ type: BarcodeResolveResponseDto })
+  async resolveBarcode(
+    @Query('code') code: string,
+  ): Promise<BarcodeResolveResponseDto> {
+    const normalized = normalizeBarcode(code ?? '');
+    if (!normalized) {
+      throw new BadRequestException(
+        'Query "code" must be a valid barcode (6–32 alphanumeric characters, no spaces)',
+      );
+    }
+    return this.productsService.resolveBarcode(normalized);
   }
 
   @Get('by-name/:normalizedName')

@@ -47,4 +47,13 @@ export class CreateProductDto {
   @IsString({ each: true })
   @MaxLength(100, { each: true })
   searchTerms?: string[] | null;
+
+  @ApiPropertyOptional({
+    description: 'Barcode (EAN-13, UPC, etc.) — must be unique in catalog when set',
+    example: '3017620422003',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  barcode?: string | null;
 }

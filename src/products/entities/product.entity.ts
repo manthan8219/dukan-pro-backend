@@ -39,4 +39,11 @@ export class Product extends BaseEntity {
   })
   @Column({ type: 'text', array: true, nullable: true })
   searchTerms: string[] | null;
+
+  @ApiPropertyOptional({
+    description: 'GTIN / EAN / UPC etc. Unique among non-deleted products when set.',
+    example: '3017620422003',
+  })
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  barcode: string | null;
 }
