@@ -57,4 +57,15 @@ export class CustomerDemandResponseDto {
     description: 'Shops that submitted a quotation',
   })
   quotationCount?: number;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Set when the customer accepts one quotation (status AWARDED)',
+  })
+  awardedInvitationId?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Display name of the shop whose quotation was accepted',
+  })
+  awardedShopDisplayName?: string | null;
 }

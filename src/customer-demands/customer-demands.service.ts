@@ -271,6 +271,61 @@ export class CustomerDemandsService {
     });
   }
 
+  async acceptQuotation(
+    userId: string,
+    demandId: string,
+    invitationId: string,
+  ): Promise<CustomerDemandResponseDto> {
+    const existing = await this.findOneEntityForUser(userId, demandId);
+    if (existing.status !== CustomerDemandStatus.LIVE) {
+      throw new BadRequestException(
+        'You can only accept a quotation while the request is open (LIVE)',
+      );
+    }
+    const inv =
+      await this.demandInvitationsService.findQuotedInvitationForDemand(
+        demandId,
+        invitationId,
+      );
+    if (!inv) {
+      throw new BadRequestException(
+        'That quotation was not found or is no longer available to accept',
+      );
+    }
+    const before = this.snapshot(existing);
+    return this.demandRepo.manager.transaction(async (em) => {
+      const dRepo = em.getRepository(CustomerDemand);
+      const row = await dRepo.findOne({
+        where: { id: demandId, userId, isDeleted: false },
+      });
+      if (!row || row.status !== CustomerDemandStatus.LIVE) {
+        throw new NotFoundException(`Demand ${demandId} not found`);
+      }
+      row.status = CustomerDemandStatus.AWARDED;
+      row.awardedInvitationId = invitationId;
+      row.updatedBy = userId;
+      const saved = await dRepo.save(row);
+      await this.appendAudit(
+        em,
+        demandId,
+        userId,
+        CustomerDemandAuditAction.STATUS_CHANGED,
+        {
+          before,
+          after: this.snapshot(saved),
+          note: 'Customer accepted a quotation',
+          acceptedInvitationId: invitationId,
+          acceptedShopId: inv.shopId,
+        },
+      );
+      const loaded = await this.loadDemand(saved.id, em);
+      const statsMap =
+        await this.demandInvitationsService.countStatsByDemandIds([loaded.id]);
+      const stats = statsMap.get(loaded.id) ?? { notified: 0, quoted: 0 };
+      return await this.toResponse(loaded, stats);
+    });
+  }
+
   async remove(userId: string, demandId: string): Promise<void> {
     const existing = await this.findOneEntityForUser(userId, demandId);
     const before = this.snapshot(existing);
@@ -427,6 +482,7 @@ export class CustomerDemandsService {
       publishedAt: d.publishedAt ? d.publishedAt.toISOString() : null,
       deliveryLatitude: d.deliveryLatitude,
       deliveryLongitude: d.deliveryLongitude,
+      awardedInvitationId: d.awardedInvitationId,
     };
   }
 
@@ -456,6 +512,14 @@ export class CustomerDemandsService {
       url && url.length > 0
         ? await this.storageService.toReadableUrl(url)
         : null;
+    let awardedShopDisplayName: string | null = null;
+    if (row.awardedInvitationId) {
+      const awarded =
+        await this.demandInvitationsService.getInvitationWithShop(
+          row.awardedInvitationId,
+        );
+      awardedShopDisplayName = awarded?.shop?.displayName ?? null;
+    }
     return {
       id: row.id,
       userId: row.userId,
@@ -473,6 +537,8 @@ export class CustomerDemandsService {
       deliveryLongitude: row.deliveryLongitude,
       notifiedShopCount: stats?.notified ?? 0,
       quotationCount: stats?.quoted ?? 0,
+      awardedInvitationId: row.awardedInvitationId,
+      awardedShopDisplayName,
     };
   }
 

@@ -81,6 +81,13 @@ export class CustomerDemand extends BaseEntity {
   @Column({ type: 'double precision', nullable: true })
   deliveryLongitude: number | null;
 
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Invitation the customer accepted (demand status AWARDED)',
+  })
+  @Column({ type: 'uuid', nullable: true })
+  awardedInvitationId: string | null;
+
   @OneToMany(() => CustomerDemandAudit, (a) => a.demand)
   audits: CustomerDemandAudit[];
 

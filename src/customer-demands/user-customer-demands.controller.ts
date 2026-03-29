@@ -21,6 +21,7 @@ import { CustomerDemandsService } from './customer-demands.service';
 import { CustomerDemandAuditEntryDto } from './dto/customer-demand-audit-entry.dto';
 import { CustomerDemandQuotationDto } from './dto/customer-demand-quotation.dto';
 import { CustomerDemandResponseDto } from './dto/customer-demand-response.dto';
+import { AcceptDemandQuotationDto } from './dto/accept-demand-quotation.dto';
 import { CreateCustomerDemandDto } from './dto/create-customer-demand.dto';
 import { PublishCustomerDemandDto } from './dto/publish-customer-demand.dto';
 import { UpdateCustomerDemandDto } from './dto/update-customer-demand.dto';
@@ -134,6 +135,26 @@ export class UserCustomerDemandsController {
     @Param('demandId', ParseUUIDPipe) demandId: string,
   ): Promise<CustomerDemandResponseDto> {
     return this.customerDemandsService.close(userId, demandId);
+  }
+
+  @Post(':demandId/accept-quotation')
+  @ApiOperation({
+    summary: 'Accept one shop quotation (LIVE → AWARDED)',
+    description:
+      'Pass the invitation id from GET …/quotations. Locks the request to that shop.',
+  })
+  @ApiOkResponse({ type: CustomerDemandResponseDto })
+  @ApiNotFoundResponse()
+  acceptQuotation(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Param('demandId', ParseUUIDPipe) demandId: string,
+    @Body() dto: AcceptDemandQuotationDto,
+  ): Promise<CustomerDemandResponseDto> {
+    return this.customerDemandsService.acceptQuotation(
+      userId,
+      demandId,
+      dto.invitationId,
+    );
   }
 
   @Delete(':demandId')

@@ -184,6 +184,30 @@ export class DemandInvitationsService {
     );
   }
 
+  async findQuotedInvitationForDemand(
+    demandId: string,
+    invitationId: string,
+  ): Promise<DemandShopInvitation | null> {
+    return this.invitationRepo.findOne({
+      where: {
+        id: invitationId,
+        demandId,
+        isDeleted: false,
+        responseKind: DemandShopInvitationResponse.QUOTED,
+      },
+      relations: ['shop'],
+    });
+  }
+
+  async getInvitationWithShop(
+    invitationId: string,
+  ): Promise<DemandShopInvitation | null> {
+    return this.invitationRepo.findOne({
+      where: { id: invitationId, isDeleted: false },
+      relations: ['shop'],
+    });
+  }
+
   async countStatsByDemandIds(
     demandIds: string[],
   ): Promise<Map<string, { notified: number; quoted: number }>> {
