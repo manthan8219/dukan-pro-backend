@@ -1,0 +1,7 @@
+export enum CustomerDemandAuditAction {
+  CREATED = 'CREATED',
+  UPDATED = 'UPDATED',
+  PUBLISHED = 'PUBLISHED',
+  STATUS_CHANGED = 'STATUS_CHANGED',
+  SOFT_DELETED = 'SOFT_DELETED',
+}
