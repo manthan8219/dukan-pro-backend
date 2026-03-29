@@ -86,7 +86,7 @@ export class UsersService {
         email,
         phoneNumber: phone,
         isVerified: true,
-        role: UserRole.PENDING,
+        role: null,
         sellerOnboardingComplete: false,
         lastLoginAt: new Date(),
       });
@@ -120,19 +120,17 @@ export class UsersService {
   }
 
   /**
-   * PATCH /users/:id — blocks changing `role` once it is no longer {@link UserRole.PENDING}.
+   * PATCH /users/:id — blocks changing `role` once it has been set (non-null).
    */
   async update(id: string, dto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
+    if (dto.role === null) {
+      throw new BadRequestException('Role cannot be cleared.');
+    }
     if (dto.role !== undefined && dto.role !== user.role) {
-      if (user.role !== UserRole.PENDING) {
+      if (user.role != null) {
         throw new ForbiddenException(
           'Your role is already set and cannot be changed.',
-        );
-      }
-      if (dto.role === UserRole.PENDING) {
-        throw new BadRequestException(
-          'Choose customer or seller to continue.',
         );
       }
     }
@@ -149,7 +147,7 @@ export class UsersService {
 
   /**
    * Internal updates (reconciliation, seller-profile promotion) that may change role
-   * even when the user is not {@link UserRole.PENDING}.
+   * even when it was already set.
    */
   async updateIgnoringRoleLock(id: string, dto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);

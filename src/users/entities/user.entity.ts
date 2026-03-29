@@ -25,9 +25,14 @@ export class User extends BaseEntity {
   @Column({ type: 'boolean', default: false })
   isVerified: boolean;
 
-  @ApiProperty({ enum: UserRole, default: UserRole.PENDING })
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.PENDING })
-  role: UserRole;
+  @ApiPropertyOptional({
+    enum: UserRole,
+    description:
+      'Null until the user chooses customer or seller; then locked (see PATCH /users/:id).',
+    nullable: true,
+  })
+  @Column({ type: 'enum', enum: UserRole, nullable: true })
+  role: UserRole | null;
 
   @ApiPropertyOptional({
     description:
