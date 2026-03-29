@@ -9,6 +9,8 @@ import { CustomerOrdersController } from './customer-orders.controller';
 import { OrderItem } from './entities/order-item.entity';
 import { Order } from './entities/order.entity';
 import { OrdersService } from './orders.service';
+import { SellerShopDashboardService } from './seller-shop-dashboard.service';
+import { ShopOwnerDashboardController } from './shop-owner-dashboard.controller';
 import { ShopOwnerOrdersController } from './shop-owner-orders.controller';
 
 @Module({
@@ -23,8 +25,12 @@ import { ShopOwnerOrdersController } from './shop-owner-orders.controller';
     ShopsModule,
     NotificationsModule,
   ],
-  controllers: [CustomerOrdersController, ShopOwnerOrdersController],
-  providers: [OrdersService],
+  controllers: [
+    CustomerOrdersController,
+    ShopOwnerOrdersController,
+    ShopOwnerDashboardController,
+  ],
+  providers: [OrdersService, SellerShopDashboardService],
   exports: [OrdersService],
 })
 export class OrdersModule {}
