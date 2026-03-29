@@ -9,6 +9,7 @@ import { ContentKind } from '../content/content-kind.enum';
 import { ContentService } from '../content/content.service';
 import { ShopsService } from '../shops/shops.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { StorageService } from '../storage/storage.service';
 import { UsersService } from '../users/users.service';
 import { MIN_RECEIPT_ORDER_TOTAL_MINOR } from './customer-demand.constants';
 import { DemandInvitationsService } from './demand-invitations.service';
@@ -35,6 +36,7 @@ export class CustomerDemandsService {
     private readonly shopsService: ShopsService,
     private readonly demandInvitationsService: DemandInvitationsService,
     private readonly notificationsService: NotificationsService,
+    private readonly storageService: StorageService,
   ) {}
 
   async create(
@@ -72,7 +74,7 @@ export class CustomerDemandsService {
           after: this.snapshot(saved),
         },
       );
-      return this.toResponse(await this.loadDemand(saved.id, em));
+      return await this.toResponse(await this.loadDemand(saved.id, em));
     });
   }
 
@@ -130,7 +132,7 @@ export class CustomerDemandsService {
           after: this.snapshot(saved),
         },
       );
-      return this.toResponse(await this.loadDemand(saved.id, em));
+      return await this.toResponse(await this.loadDemand(saved.id, em));
     });
   }
 
@@ -224,7 +226,7 @@ export class CustomerDemandsService {
       const statsMap =
         await this.demandInvitationsService.countStatsByDemandIds([loaded.id]);
       const stats = statsMap.get(loaded.id) ?? { notified: 0, quoted: 0 };
-      return this.toResponse(loaded, stats);
+      return await this.toResponse(loaded, stats);
     });
   }
 
@@ -265,7 +267,7 @@ export class CustomerDemandsService {
       const statsMap =
         await this.demandInvitationsService.countStatsByDemandIds([loaded.id]);
       const stats = statsMap.get(loaded.id) ?? { notified: 0, quoted: 0 };
-      return this.toResponse(loaded, stats);
+      return await this.toResponse(loaded, stats);
     });
   }
 
@@ -312,7 +314,7 @@ export class CustomerDemandsService {
       row.id,
     ]);
     const stats = statsMap.get(row.id) ?? { notified: 0, quoted: 0 };
-    return this.toResponse(row, stats);
+    return await this.toResponse(row, stats);
   }
 
   async listForUser(userId: string): Promise<CustomerDemandResponseDto[]> {
@@ -325,8 +327,10 @@ export class CustomerDemandsService {
     const ids = rows.map((r) => r.id);
     const statsMap =
       await this.demandInvitationsService.countStatsByDemandIds(ids);
-    return rows.map((r) =>
-      this.toResponse(r, statsMap.get(r.id) ?? { notified: 0, quoted: 0 }),
+    return Promise.all(
+      rows.map((r) =>
+        this.toResponse(r, statsMap.get(r.id) ?? { notified: 0, quoted: 0 }),
+      ),
     );
   }
 
@@ -339,8 +343,10 @@ export class CustomerDemandsService {
     const ids = rows.map((r) => r.id);
     const statsMap =
       await this.demandInvitationsService.countStatsByDemandIds(ids);
-    return rows.map((r) =>
-      this.toResponse(r, statsMap.get(r.id) ?? { notified: 0, quoted: 0 }),
+    return Promise.all(
+      rows.map((r) =>
+        this.toResponse(r, statsMap.get(r.id) ?? { notified: 0, quoted: 0 }),
+      ),
     );
   }
 
@@ -441,11 +447,15 @@ export class CustomerDemandsService {
     await repo.save(audit);
   }
 
-  private toResponse(
+  private async toResponse(
     row: CustomerDemand,
     stats?: { notified: number; quoted: number },
-  ): CustomerDemandResponseDto {
+  ): Promise<CustomerDemandResponseDto> {
     const url = row.receiptContent?.storageUrl?.trim();
+    const receiptImageUrl =
+      url && url.length > 0
+        ? await this.storageService.toReadableUrl(url)
+        : null;
     return {
       id: row.id,
       userId: row.userId,
@@ -453,7 +463,7 @@ export class CustomerDemandsService {
       details: row.details,
       budgetHint: row.budgetHint,
       receiptContentId: row.receiptContentId,
-      receiptImageUrl: url && url.length > 0 ? url : null,
+      receiptImageUrl,
       receiptOrderTotalMinor: row.receiptOrderTotalMinor,
       status: row.status,
       publishedAt: row.publishedAt,

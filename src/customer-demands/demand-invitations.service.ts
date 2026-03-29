@@ -15,6 +15,7 @@ import { SubmitDemandQuotationDto } from './dto/submit-demand-quotation.dto';
 import { CustomerDemandStatus } from './enums/customer-demand-status.enum';
 import { DemandShopInvitationResponse } from './enums/demand-shop-invitation-response.enum';
 import { NotificationsService } from '../notifications/notifications.service';
+import { StorageService } from '../storage/storage.service';
 import { CustomerDemand } from './entities/customer-demand.entity';
 import { DemandShopInvitation } from './entities/demand-shop-invitation.entity';
 
@@ -28,6 +29,7 @@ export class DemandInvitationsService {
     private readonly shopsService: ShopsService,
     private readonly contentService: ContentService,
     private readonly notificationsService: NotificationsService,
+    private readonly storageService: StorageService,
   ) {}
 
   async bulkCreatePending(
@@ -59,14 +61,13 @@ export class DemandInvitationsService {
       relations: ['demand', 'demand.receiptContent', 'quotationDocument'],
       order: { createdAt: 'DESC' },
     });
-    return rows
-      .filter(
-        (i) =>
-          i.demand &&
-          !i.demand.isDeleted &&
-          i.demand.status === CustomerDemandStatus.LIVE,
-      )
-      .map((i) => this.toShopView(i));
+    const filtered = rows.filter(
+      (i) =>
+        i.demand &&
+        !i.demand.isDeleted &&
+        i.demand.status === CustomerDemandStatus.LIVE,
+    );
+    return Promise.all(filtered.map((i) => this.toShopView(i)));
   }
 
   async rejectInvitation(
@@ -97,7 +98,7 @@ export class DemandInvitationsService {
     await this.notificationsService.markSellerInviteReadForInvitation(
       invitationId,
     );
-    return this.toShopView(await this.reloadInvitation(saved.id));
+    return await this.toShopView(await this.reloadInvitation(saved.id));
   }
 
   async submitQuotation(
@@ -142,7 +143,7 @@ export class DemandInvitationsService {
         actorUserId: shop.userId,
       });
     }
-    return this.toShopView(await this.reloadInvitation(saved.id));
+    return await this.toShopView(await this.reloadInvitation(saved.id));
   }
 
   async listQuotationsForCustomer(
@@ -164,18 +165,23 @@ export class DemandInvitationsService {
       relations: ['shop', 'quotationDocument'],
       order: { respondedAt: 'DESC' },
     });
-    return rows.map((r) => ({
-      invitationId: r.id,
-      shopId: r.shopId,
-      shopDisplayName: r.shop.displayName,
-      quotationText: r.quotationText ?? '',
-      quotationDocumentUrl:
-        r.quotationDocument?.storageUrl?.trim() &&
-        r.quotationDocument.storageUrl.length > 0
-          ? r.quotationDocument.storageUrl.trim()
-          : null,
-      respondedAt: r.respondedAt!,
-    }));
+    return Promise.all(
+      rows.map(async (r) => {
+        const raw = r.quotationDocument?.storageUrl?.trim();
+        const quotationDocumentUrl =
+          raw && raw.length > 0
+            ? await this.storageService.toReadableUrl(raw)
+            : null;
+        return {
+          invitationId: r.id,
+          shopId: r.shopId,
+          shopDisplayName: r.shop.displayName,
+          quotationText: r.quotationText ?? '',
+          quotationDocumentUrl,
+          respondedAt: r.respondedAt!,
+        };
+      }),
+    );
   }
 
   async countStatsByDemandIds(
@@ -243,24 +249,33 @@ export class DemandInvitationsService {
     return row;
   }
 
-  private toShopView(inv: DemandShopInvitation): ShopDemandInvitationViewDto {
+  private async toShopView(
+    inv: DemandShopInvitation,
+  ): Promise<ShopDemandInvitationViewDto> {
     const d = inv.demand;
     const receiptUrl = d.receiptContent?.storageUrl?.trim();
     const docUrl = inv.quotationDocument?.storageUrl?.trim();
+    const customerReceiptImageUrl =
+      receiptUrl && receiptUrl.length > 0
+        ? await this.storageService.toReadableUrl(receiptUrl)
+        : null;
+    const quotationDocumentUrl =
+      docUrl && docUrl.length > 0
+        ? await this.storageService.toReadableUrl(docUrl)
+        : null;
     return {
       invitationId: inv.id,
       demandId: d.id,
       demandTitle: d.title,
       demandDetails: d.details,
       demandBudgetHint: d.budgetHint,
-      customerReceiptImageUrl:
-        receiptUrl && receiptUrl.length > 0 ? receiptUrl : null,
+      customerReceiptImageUrl,
       receiptOrderTotalMinor: d.receiptOrderTotalMinor,
       demandStatus: d.status,
       responseKind: inv.responseKind,
       rejectReason: inv.rejectReason,
       quotationText: inv.quotationText,
-      quotationDocumentUrl: docUrl && docUrl.length > 0 ? docUrl : null,
+      quotationDocumentUrl,
       respondedAt: inv.respondedAt,
     };
   }
