@@ -29,7 +29,10 @@ export class NotificationsService implements OnModuleInit {
     if (process.env.NODE_ENV === 'test') {
       return;
     }
-    setInterval(() => void this.maybeEmitMonthlySellerInsights(), MONTHLY_INSIGHTS_CHECK_MS);
+    setInterval(
+      () => void this.maybeEmitMonthlySellerInsights(),
+      MONTHLY_INSIGHTS_CHECK_MS,
+    );
   }
 
   async getSummary(userId: string): Promise<NotificationSummaryDto> {
@@ -414,7 +417,9 @@ export class NotificationsService implements OnModuleInit {
       if (now.getUTCDate() !== 1) {
         return;
       }
-      const prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+      const prev = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1),
+      );
       const periodKey = `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}`;
       const monthLabel = prev.toLocaleString('en-IN', {
         month: 'long',

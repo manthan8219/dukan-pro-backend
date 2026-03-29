@@ -6,7 +6,7 @@ export function parseCsvRows(text: string): string[][] {
   let i = 0;
   let inQuotes = false;
   while (i < text.length) {
-    const c = text[i]!;
+    const c = text[i];
     if (inQuotes) {
       if (c === '"') {
         if (text[i + 1] === '"') {
@@ -61,7 +61,10 @@ function normalizeHeader(h: string): string {
   return h.trim().toLowerCase().replace(/\s+/g, '_');
 }
 
-export function pickColumnIndex(headers: string[], candidates: string[]): number {
+export function pickColumnIndex(
+  headers: string[],
+  candidates: string[],
+): number {
   const norm = headers.map(normalizeHeader);
   for (const want of candidates) {
     const w = want.toLowerCase();
@@ -107,7 +110,12 @@ export function parsePriceMinorCell(
     return rupeesToMinor(t);
   }
   const n = Number(t);
-  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1 || n > 2_000_000_000) {
+  if (
+    !Number.isFinite(n) ||
+    !Number.isInteger(n) ||
+    n < 1 ||
+    n > 2_000_000_000
+  ) {
     return null;
   }
   return n;
@@ -138,14 +146,12 @@ export type ParseInventoryCsvSuccess = {
 export function parseInventoryCsv(
   text: string,
   defaultPriceMinor: number | null,
-):
-  | ParseInventoryCsvSuccess
-  | ParseInventoryCsvFailure {
+): ParseInventoryCsvSuccess | ParseInventoryCsvFailure {
   const rows = parseCsvRows(text);
   if (rows.length === 0) {
     return { error: 'No rows found in CSV.' };
   }
-  const headers = rows[0]!.map((c) => c.trim());
+  const headers = rows[0].map((c) => c.trim());
   const nameIdx = pickColumnIndex(headers, [
     'name',
     'product',
@@ -202,7 +208,7 @@ export function parseInventoryCsv(
   const parseWarnings: { rowNumber: number; message: string }[] = [];
 
   for (let i = 0; i < dataRows.length; i++) {
-    const cells = dataRows[i]!;
+    const cells = dataRows[i];
     const rowNumber = i + 2;
     const name = (cells[nameIdx] ?? '').trim();
     const rawQ = (cells[qtyIdx] ?? '').trim();

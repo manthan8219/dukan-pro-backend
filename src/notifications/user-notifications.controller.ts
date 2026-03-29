@@ -95,7 +95,9 @@ export class UserNotificationsController {
   }
 
   @Post(':notificationId/read')
-  @ApiOperation({ summary: 'Mark one notification as read (e.g. after opening from bell)' })
+  @ApiOperation({
+    summary: 'Mark one notification as read (e.g. after opening from bell)',
+  })
   @ApiOkResponse({ type: NotificationSummaryDto })
   markOneRead(
     @Param('userId', ParseUUIDPipe) userId: string,

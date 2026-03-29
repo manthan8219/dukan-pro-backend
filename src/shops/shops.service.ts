@@ -133,7 +133,9 @@ export class ShopsService {
         shopType: shop.offering.shopType,
         dealIn: shop.offering.dealIn,
         averageRating:
-          avg != null && Number.isFinite(avg) ? Math.round(avg * 100) / 100 : null,
+          avg != null && Number.isFinite(avg)
+            ? Math.round(avg * 100) / 100
+            : null,
         ratingCount: shop.ratingCount,
       });
     }

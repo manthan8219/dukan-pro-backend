@@ -28,7 +28,9 @@ import { UpdateCustomerDemandDto } from './dto/update-customer-demand.dto';
 @ApiTags('customer-demands')
 @Controller('users/:userId/demands')
 export class UserCustomerDemandsController {
-  constructor(private readonly customerDemandsService: CustomerDemandsService) {}
+  constructor(
+    private readonly customerDemandsService: CustomerDemandsService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a DRAFT request (customer)' })

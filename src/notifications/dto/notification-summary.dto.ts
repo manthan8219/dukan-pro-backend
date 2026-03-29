@@ -17,7 +17,8 @@ export class NotificationSummaryDto {
   customerAppUnread: number;
 
   @ApiProperty({
-    description: 'Unread seller demand-board invitations (legacy + INVITATION/DEMAND_SHOP)',
+    description:
+      'Unread seller demand-board invitations (legacy + INVITATION/DEMAND_SHOP)',
   })
   sellerDemandInvitesUnread: number;
 
@@ -27,7 +28,8 @@ export class NotificationSummaryDto {
   customerNewQuotationsUnread: number;
 
   @ApiPropertyOptional({
-    description: 'Per-type unread counts (string keys = UserNotificationType values)',
+    description:
+      'Per-type unread counts (string keys = UserNotificationType values)',
     type: 'object',
     additionalProperties: { type: 'number' },
   })

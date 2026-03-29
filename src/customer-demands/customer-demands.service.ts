@@ -63,9 +63,15 @@ export class CustomerDemandsService {
         updatedBy: userId,
       });
       const saved = await dRepo.save(row);
-      await this.appendAudit(em, saved.id, userId, CustomerDemandAuditAction.CREATED, {
-        after: this.snapshot(saved),
-      });
+      await this.appendAudit(
+        em,
+        saved.id,
+        userId,
+        CustomerDemandAuditAction.CREATED,
+        {
+          after: this.snapshot(saved),
+        },
+      );
       return this.toResponse(await this.loadDemand(saved.id, em));
     });
   }
@@ -114,10 +120,16 @@ export class CustomerDemandsService {
       }
       row.updatedBy = userId;
       const saved = await dRepo.save(row);
-      await this.appendAudit(em, demandId, userId, CustomerDemandAuditAction.UPDATED, {
-        before,
-        after: this.snapshot(saved),
-      });
+      await this.appendAudit(
+        em,
+        demandId,
+        userId,
+        CustomerDemandAuditAction.UPDATED,
+        {
+          before,
+          after: this.snapshot(saved),
+        },
+      );
       return this.toResponse(await this.loadDemand(saved.id, em));
     });
   }
@@ -196,25 +208,35 @@ export class CustomerDemandsService {
         demandTitle: saved.title,
         invitations,
       });
-      await this.appendAudit(em, demandId, userId, CustomerDemandAuditAction.PUBLISHED, {
-        before,
-        after: this.snapshot(saved),
-        notifiedShopIds: shopIds,
-        notifiedShopCount: shopIds.length,
-      });
+      await this.appendAudit(
+        em,
+        demandId,
+        userId,
+        CustomerDemandAuditAction.PUBLISHED,
+        {
+          before,
+          after: this.snapshot(saved),
+          notifiedShopIds: shopIds,
+          notifiedShopCount: shopIds.length,
+        },
+      );
       const loaded = await this.loadDemand(saved.id, em);
-      const statsMap = await this.demandInvitationsService.countStatsByDemandIds([
-        loaded.id,
-      ]);
+      const statsMap =
+        await this.demandInvitationsService.countStatsByDemandIds([loaded.id]);
       const stats = statsMap.get(loaded.id) ?? { notified: 0, quoted: 0 };
       return this.toResponse(loaded, stats);
     });
   }
 
-  async close(userId: string, demandId: string): Promise<CustomerDemandResponseDto> {
+  async close(
+    userId: string,
+    demandId: string,
+  ): Promise<CustomerDemandResponseDto> {
     const existing = await this.findOneEntityForUser(userId, demandId);
     if (existing.status !== CustomerDemandStatus.LIVE) {
-      throw new BadRequestException('Only LIVE requests can be closed this way');
+      throw new BadRequestException(
+        'Only LIVE requests can be closed this way',
+      );
     }
     const before = this.snapshot(existing);
     return this.demandRepo.manager.transaction(async (em) => {
@@ -228,15 +250,20 @@ export class CustomerDemandsService {
       row.status = CustomerDemandStatus.CLOSED;
       row.updatedBy = userId;
       const saved = await dRepo.save(row);
-      await this.appendAudit(em, demandId, userId, CustomerDemandAuditAction.STATUS_CHANGED, {
-        before,
-        after: this.snapshot(saved),
-        note: 'Customer closed request',
-      });
+      await this.appendAudit(
+        em,
+        demandId,
+        userId,
+        CustomerDemandAuditAction.STATUS_CHANGED,
+        {
+          before,
+          after: this.snapshot(saved),
+          note: 'Customer closed request',
+        },
+      );
       const loaded = await this.loadDemand(saved.id, em);
-      const statsMap = await this.demandInvitationsService.countStatsByDemandIds([
-        loaded.id,
-      ]);
+      const statsMap =
+        await this.demandInvitationsService.countStatsByDemandIds([loaded.id]);
       const stats = statsMap.get(loaded.id) ?? { notified: 0, quoted: 0 };
       return this.toResponse(loaded, stats);
     });
@@ -256,10 +283,16 @@ export class CustomerDemandsService {
       row.isDeleted = true;
       row.updatedBy = userId;
       await dRepo.save(row);
-      await this.appendAudit(em, demandId, userId, CustomerDemandAuditAction.SOFT_DELETED, {
-        before,
-        after: { ...this.snapshot(row), isDeleted: true },
-      });
+      await this.appendAudit(
+        em,
+        demandId,
+        userId,
+        CustomerDemandAuditAction.SOFT_DELETED,
+        {
+          before,
+          after: { ...this.snapshot(row), isDeleted: true },
+        },
+      );
     });
   }
 
@@ -290,12 +323,10 @@ export class CustomerDemandsService {
       order: { updatedAt: 'DESC' },
     });
     const ids = rows.map((r) => r.id);
-    const statsMap = await this.demandInvitationsService.countStatsByDemandIds(ids);
+    const statsMap =
+      await this.demandInvitationsService.countStatsByDemandIds(ids);
     return rows.map((r) =>
-      this.toResponse(
-        r,
-        statsMap.get(r.id) ?? { notified: 0, quoted: 0 },
-      ),
+      this.toResponse(r, statsMap.get(r.id) ?? { notified: 0, quoted: 0 }),
     );
   }
 
@@ -306,12 +337,10 @@ export class CustomerDemandsService {
       order: { publishedAt: 'DESC' },
     });
     const ids = rows.map((r) => r.id);
-    const statsMap = await this.demandInvitationsService.countStatsByDemandIds(ids);
+    const statsMap =
+      await this.demandInvitationsService.countStatsByDemandIds(ids);
     return rows.map((r) =>
-      this.toResponse(
-        r,
-        statsMap.get(r.id) ?? { notified: 0, quoted: 0 },
-      ),
+      this.toResponse(r, statsMap.get(r.id) ?? { notified: 0, quoted: 0 }),
     );
   }
 
@@ -330,7 +359,9 @@ export class CustomerDemandsService {
     demandId: string,
   ): Promise<CustomerDemandAuditEntryDto[]> {
     await this.usersService.findOne(userId);
-    const owned = await this.demandRepo.findOne({ where: { id: demandId, userId } });
+    const owned = await this.demandRepo.findOne({
+      where: { id: demandId, userId },
+    });
     if (!owned) {
       throw new NotFoundException(`Demand ${demandId} not found`);
     }

@@ -12,7 +12,8 @@ export class ShopNearbySummaryDto {
   name: string;
 
   @ApiProperty({
-    description: 'Straight-line distance from the query point to the shop pin (km)',
+    description:
+      'Straight-line distance from the query point to the shop pin (km)',
     example: 1.25,
   })
   distanceKm: number;

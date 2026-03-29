@@ -48,7 +48,9 @@ export class CreateCustomerDemandDto {
   @Max(2_000_000_000)
   receiptOrderTotalMinor?: number | null;
 
-  @ApiPropertyOptional({ description: 'Delivery pin for radius matching on publish' })
+  @ApiPropertyOptional({
+    description: 'Delivery pin for radius matching on publish',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

@@ -17,14 +17,9 @@ async function bootstrap() {
         .map((o) => o.trim().replace(/\/+$/, ''))
         .filter(Boolean)
     : [];
-  const defaultDevOrigins = [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-  ];
+  const defaultDevOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
   app.enableCors({
-    origin: frontendOrigins.length
-      ? frontendOrigins
-      : defaultDevOrigins,
+    origin: frontendOrigins.length ? frontendOrigins : defaultDevOrigins,
     credentials: true,
   });
 

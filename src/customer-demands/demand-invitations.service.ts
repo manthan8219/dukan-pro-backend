@@ -94,10 +94,10 @@ export class DemandInvitationsService {
     inv.respondedByUserId = shop.userId;
     inv.updatedBy = shop.userId;
     const saved = await this.invitationRepo.save(inv);
-    await this.notificationsService.markSellerInviteReadForInvitation(invitationId);
-    return this.toShopView(
-      await this.reloadInvitation(saved.id),
+    await this.notificationsService.markSellerInviteReadForInvitation(
+      invitationId,
     );
+    return this.toShopView(await this.reloadInvitation(saved.id));
   }
 
   async submitQuotation(
@@ -130,7 +130,9 @@ export class DemandInvitationsService {
     inv.updatedBy = shop.userId;
     const saved = await this.invitationRepo.save(inv);
     const customerUserId = inv.demand?.userId;
-    await this.notificationsService.markSellerInviteReadForInvitation(invitationId);
+    await this.notificationsService.markSellerInviteReadForInvitation(
+      invitationId,
+    );
     if (customerUserId) {
       await this.notificationsService.recordCustomerQuotation({
         customerUserId,
@@ -211,7 +213,9 @@ export class DemandInvitationsService {
       inv.demand.isDeleted ||
       inv.demand.status !== CustomerDemandStatus.LIVE
     ) {
-      throw new BadRequestException('This demand is no longer open for responses');
+      throw new BadRequestException(
+        'This demand is no longer open for responses',
+      );
     }
   }
 
@@ -256,8 +260,7 @@ export class DemandInvitationsService {
       responseKind: inv.responseKind,
       rejectReason: inv.rejectReason,
       quotationText: inv.quotationText,
-      quotationDocumentUrl:
-        docUrl && docUrl.length > 0 ? docUrl : null,
+      quotationDocumentUrl: docUrl && docUrl.length > 0 ? docUrl : null,
       respondedAt: inv.respondedAt,
     };
   }

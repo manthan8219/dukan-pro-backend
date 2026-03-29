@@ -66,9 +66,8 @@ export class ShopProductsService {
         category: row.category,
       };
       try {
-        const product = await this.productsService.findOrCreateForImport(
-          catalogDto,
-        );
+        const product =
+          await this.productsService.findOrCreateForImport(catalogDto);
         const listingDto: CreateShopProductDto = {
           productId: product.id,
           quantity: row.quantity,
@@ -128,9 +127,7 @@ export class ShopProductsService {
     try {
       buf = await fs.readFile(fullPath);
     } catch {
-      throw new BadRequestException(
-        `Could not read file: ${relativePath}`,
-      );
+      throw new BadRequestException(`Could not read file: ${relativePath}`);
     }
     const text = buf.toString('utf8');
     return this.importInventoryCsvFromText(shopId, text);

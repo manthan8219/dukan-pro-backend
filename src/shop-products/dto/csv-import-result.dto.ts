@@ -13,7 +13,9 @@ export class CsvImportResultDto {
   @ApiProperty({ description: 'New shop listings created' })
   created: number;
 
-  @ApiProperty({ description: 'Existing listings updated (same catalog product)' })
+  @ApiProperty({
+    description: 'Existing listings updated (same catalog product)',
+  })
   updated: number;
 
   @ApiProperty({ description: 'Rows skipped before DB (parse issues)' })

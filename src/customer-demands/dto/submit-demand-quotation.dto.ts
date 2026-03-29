@@ -18,7 +18,8 @@ export class SubmitDemandQuotationDto {
 
   @ApiPropertyOptional({
     format: 'uuid',
-    description: 'Optional PDF or image (POST /content with kind DOCUMENT, BILL, or IMAGE)',
+    description:
+      'Optional PDF or image (POST /content with kind DOCUMENT, BILL, or IMAGE)',
   })
   @IsOptional()
   @IsUUID()

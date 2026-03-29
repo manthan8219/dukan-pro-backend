@@ -1,16 +1,14 @@
 import { Controller, Get } from '@nestjs/common';
-import {
-  ApiOkResponse,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CustomerDemandsService } from './customer-demands.service';
 import { CustomerDemandResponseDto } from './dto/customer-demand-response.dto';
 
 @ApiTags('customer-demands')
 @Controller('customer-demands')
 export class CustomerDemandsLiveController {
-  constructor(private readonly customerDemandsService: CustomerDemandsService) {}
+  constructor(
+    private readonly customerDemandsService: CustomerDemandsService,
+  ) {}
 
   @Get('live')
   @ApiOperation({

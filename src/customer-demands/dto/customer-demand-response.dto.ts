@@ -40,7 +40,9 @@ export class CustomerDemandResponseDto {
   @ApiProperty()
   updatedAt: Date;
 
-  @ApiPropertyOptional({ description: 'Delivery latitude used when matching shops' })
+  @ApiPropertyOptional({
+    description: 'Delivery latitude used when matching shops',
+  })
   deliveryLatitude: number | null;
 
   @ApiPropertyOptional()

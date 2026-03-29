@@ -14,9 +14,7 @@ export function effectiveMaxServiceRadiusKmForOrder(params: {
   orderAmountRupees: number;
 }): number {
   const { shopDefaultRadiusKm, rules, orderAmountRupees } = params;
-  const sorted = [...rules].sort(
-    (a, b) => b.minOrderAmount - a.minOrderAmount,
-  );
+  const sorted = [...rules].sort((a, b) => b.minOrderAmount - a.minOrderAmount);
   const match = sorted.find((r) => orderAmountRupees >= r.minOrderAmount);
   return match !== undefined ? match.maxServiceRadiusKm : shopDefaultRadiusKm;
 }

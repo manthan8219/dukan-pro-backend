@@ -40,7 +40,8 @@ export class CreateShopProductDto {
   unit?: string;
 
   @ApiProperty({
-    description: 'Your selling price in minor units (e.g. 2500 = ₹25.00). Required per shop listing.',
+    description:
+      'Your selling price in minor units (e.g. 2500 = ₹25.00). Required per shop listing.',
     example: 2500,
   })
   @IsInt()

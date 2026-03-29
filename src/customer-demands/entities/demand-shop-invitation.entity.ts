@@ -2,14 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BaseEntity } from '../../commons/entities/base.entity';
 import { Content } from '../../content/entities/content.entity';
 import { Shop } from '../../shops/entities/shop.entity';
-import {
-  Column,
-  Entity,
-  Index,
-  JoinColumn,
-  ManyToOne,
-  Unique,
-} from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, Unique } from 'typeorm';
 import { DemandShopInvitationResponse } from '../enums/demand-shop-invitation-response.enum';
 import { CustomerDemand } from './customer-demand.entity';
 

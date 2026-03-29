@@ -37,7 +37,8 @@ export class UpdateShopProductDto {
   unit?: string;
 
   @ApiPropertyOptional({
-    description: 'Update selling price (minor units, min 1). Cannot be removed once set.',
+    description:
+      'Update selling price (minor units, min 1). Cannot be removed once set.',
   })
   @IsOptional()
   @IsInt()
