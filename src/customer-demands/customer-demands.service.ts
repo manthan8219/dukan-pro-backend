@@ -415,6 +415,36 @@ export class CustomerDemandsService {
     );
   }
 
+  /** After a successful checkout tied to an accepted quotation (same DB transaction). */
+  async closeDemandAfterQuotationOrder(
+    em: EntityManager,
+    userId: string,
+    demandId: string,
+  ): Promise<void> {
+    const dRepo = em.getRepository(CustomerDemand);
+    const row = await dRepo.findOne({
+      where: { id: demandId, userId, isDeleted: false },
+    });
+    if (!row || row.status !== CustomerDemandStatus.AWARDED) {
+      return;
+    }
+    const before = this.snapshot(row);
+    row.status = CustomerDemandStatus.CLOSED;
+    row.updatedBy = userId;
+    await dRepo.save(row);
+    await this.appendAudit(
+      em,
+      demandId,
+      userId,
+      CustomerDemandAuditAction.STATUS_CHANGED,
+      {
+        before,
+        after: this.snapshot(row),
+        note: 'Customer placed order from accepted quotation',
+      },
+    );
+  }
+
   async listAuditLog(
     userId: string,
     demandId: string,

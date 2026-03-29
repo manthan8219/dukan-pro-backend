@@ -1,10 +1,11 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { ContentKind } from '../content/content-kind.enum';
 import { ContentService } from '../content/content.service';
 import { ShopsService } from '../shops/shops.service';
@@ -18,6 +19,9 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
 import { CustomerDemand } from './entities/customer-demand.entity';
 import { DemandShopInvitation } from './entities/demand-shop-invitation.entity';
+import { ShopProduct } from '../shop-products/entities/shop-product.entity';
+import type { QuotedLineItemSnapshot } from './types/quoted-line-item.types';
+import { parseQuotedLineItems } from './types/quoted-line-item.types';
 
 @Injectable()
 export class DemandInvitationsService {
@@ -26,6 +30,8 @@ export class DemandInvitationsService {
     private readonly invitationRepo: Repository<DemandShopInvitation>,
     @InjectRepository(CustomerDemand)
     private readonly demandRepo: Repository<CustomerDemand>,
+    @InjectRepository(ShopProduct)
+    private readonly shopProductRepo: Repository<ShopProduct>,
     private readonly shopsService: ShopsService,
     private readonly contentService: ContentService,
     private readonly notificationsService: NotificationsService,
@@ -91,6 +97,7 @@ export class DemandInvitationsService {
     inv.rejectReason = dto.reason?.trim() ? dto.reason.trim() : null;
     inv.quotationText = null;
     inv.quotationDocumentContentId = null;
+    inv.quotedLineItems = null;
     inv.respondedAt = new Date();
     inv.respondedByUserId = shop.userId;
     inv.updatedBy = shop.userId;
@@ -121,6 +128,53 @@ export class DemandInvitationsService {
     if (dto.quotationDocumentContentId) {
       await this.assertQuotationAttachment(dto.quotationDocumentContentId);
     }
+    let quotedSnapshots: QuotedLineItemSnapshot[] | null = null;
+    if (dto.lineItems && dto.lineItems.length > 0) {
+      const mergedQty = new Map<string, number>();
+      for (const li of dto.lineItems) {
+        mergedQty.set(
+          li.shopProductId,
+          (mergedQty.get(li.shopProductId) ?? 0) + li.quantity,
+        );
+      }
+      const ids = [...mergedQty.keys()];
+      const listings = await this.shopProductRepo.find({
+        where: { id: In(ids), shopId, isDeleted: false },
+        relations: { product: true },
+      });
+      if (listings.length !== ids.length) {
+        throw new BadRequestException(
+          'One or more line items are not valid listings for your shop',
+        );
+      }
+      const byId = new Map(listings.map((s) => [s.id, s] as const));
+      quotedSnapshots = [];
+      for (const [shopProductId, quantity] of mergedQty) {
+        const sp = byId.get(shopProductId)!;
+        if (!sp.isListed) {
+          throw new BadRequestException(
+            `Listing "${sp.product.name}" is not available for quotation`,
+          );
+        }
+        if (quantity < sp.minOrderQuantity) {
+          throw new BadRequestException(
+            `Minimum quantity for "${sp.product.name}" is ${sp.minOrderQuantity}`,
+          );
+        }
+        if (quantity > sp.quantity) {
+          throw new BadRequestException(
+            `Not enough stock for "${sp.product.name}" to offer this quantity`,
+          );
+        }
+        quotedSnapshots.push({
+          shopProductId: sp.id,
+          quantity,
+          productNameSnapshot: sp.product.name.slice(0, 300),
+          unitPriceMinor: sp.priceMinor,
+          unit: sp.unit,
+        });
+      }
+    }
     inv.responseKind = DemandShopInvitationResponse.QUOTED;
     inv.rejectReason = null;
     inv.quotationText = dto.quotationText.trim();
@@ -129,6 +183,7 @@ export class DemandInvitationsService {
     inv.respondedAt = new Date();
     inv.respondedByUserId = shop.userId;
     inv.updatedBy = shop.userId;
+    inv.quotedLineItems = quotedSnapshots;
     const saved = await this.invitationRepo.save(inv);
     const customerUserId = inv.demand?.userId;
     await this.notificationsService.markSellerInviteReadForInvitation(
@@ -179,9 +234,71 @@ export class DemandInvitationsService {
           quotationText: r.quotationText ?? '',
           quotationDocumentUrl,
           respondedAt: r.respondedAt!,
+          quotedLineItems: parseQuotedLineItems(r.quotedLineItems),
         };
       }),
     );
+  }
+
+  async assertAwardedQuotationCheckoutInTx(
+    em: EntityManager,
+    customerUserId: string,
+    invitationId: string,
+    cartLines: Map<string, number>,
+  ): Promise<{ demandId: string; expectedShopId: string }> {
+    const inv = await em.getRepository(DemandShopInvitation).findOne({
+      where: { id: invitationId, isDeleted: false },
+      relations: ['demand'],
+    });
+    if (!inv) {
+      throw new NotFoundException('Quotation not found');
+    }
+    const d = inv.demand;
+    if (!d || d.isDeleted) {
+      throw new BadRequestException('This request is no longer available');
+    }
+    if (d.userId !== customerUserId) {
+      throw new ForbiddenException('This quotation belongs to another customer');
+    }
+    if (d.status !== CustomerDemandStatus.AWARDED) {
+      throw new BadRequestException(
+        'Choose a shop quotation before checking out',
+      );
+    }
+    if (d.awardedInvitationId !== invitationId) {
+      throw new BadRequestException(
+        'You accepted a different quotation — refresh and use that checkout link',
+      );
+    }
+    if (inv.responseKind !== DemandShopInvitationResponse.QUOTED) {
+      throw new BadRequestException('This quotation is no longer active');
+    }
+    const quoted = parseQuotedLineItems(inv.quotedLineItems);
+    if (quoted.length === 0) {
+      throw new BadRequestException(
+        'This quotation has no product lines for checkout. Ask the seller to send a new quote with line items.',
+      );
+    }
+    const quoteMap = new Map<string, number>();
+    for (const q of quoted) {
+      quoteMap.set(
+        q.shopProductId,
+        (quoteMap.get(q.shopProductId) ?? 0) + q.quantity,
+      );
+    }
+    if (quoteMap.size !== cartLines.size) {
+      throw new BadRequestException(
+        'Your basket must match the quoted items exactly',
+      );
+    }
+    for (const [k, v] of quoteMap) {
+      if (cartLines.get(k) !== v) {
+        throw new BadRequestException(
+          'Quantities must match the quotation exactly',
+        );
+      }
+    }
+    return { demandId: d.id, expectedShopId: inv.shopId };
   }
 
   async findQuotedInvitationForDemand(
@@ -301,6 +418,7 @@ export class DemandInvitationsService {
       quotationText: inv.quotationText,
       quotationDocumentUrl,
       respondedAt: inv.respondedAt,
+      quotedLineItems: parseQuotedLineItems(inv.quotedLineItems),
     };
   }
 }

@@ -11,6 +11,8 @@ import { ShopProduct } from '../shop-products/entities/shop-product.entity';
 import { ShopsService } from '../shops/shops.service';
 import { UserDeliveryAddress } from '../user-delivery-addresses/entities/user-delivery-address.entity';
 import { UsersService } from '../users/users.service';
+import { CustomerDemandsService } from '../customer-demands/customer-demands.service';
+import { DemandInvitationsService } from '../customer-demands/demand-invitations.service';
 import { PlaceOrdersCheckoutDto } from './dto/place-orders-checkout.dto';
 import { OrderItemResponseDto } from './dto/order-item-response.dto';
 import { OrderResponseDto } from './dto/order-response.dto';
@@ -98,6 +100,8 @@ export class OrdersService {
     private readonly usersService: UsersService,
     private readonly shopsService: ShopsService,
     private readonly notificationsService: NotificationsService,
+    private readonly demandInvitationsService: DemandInvitationsService,
+    private readonly customerDemandsService: CustomerDemandsService,
   ) {}
 
   private toItemDto(row: OrderItem): OrderItemResponseDto {
@@ -130,6 +134,7 @@ export class OrdersService {
       deliveredAt: row.deliveredAt ? row.deliveredAt.toISOString() : null,
       createdAt: row.createdAt.toISOString(),
       items: [...items].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).map((i) => this.toItemDto(i)),
+      sourceDemandInvitationId: row.sourceDemandInvitationId ?? null,
     };
   }
 
@@ -153,77 +158,101 @@ export class OrdersService {
     const merged = mergeQuantitiesByShopProductId(dto.items);
     const ids = [...merged.keys()];
 
-    const listings = await this.shopProductRepo.find({
-      where: { id: In(ids), isDeleted: false },
-      relations: { shop: true, product: true },
-    });
-    if (listings.length !== ids.length) {
-      throw new BadRequestException('One or more shop products were not found');
-    }
-
-    const byId = new Map(listings.map((s) => [s.id, s] as const));
-    const preparedByShop = new Map<string, PreparedLine[]>();
-
-    for (const [shopProductId, quantity] of merged) {
-      const sp = byId.get(shopProductId)!;
-      if (!sp.isListed) {
-        throw new BadRequestException(
-          `Product listing ${shopProductId} is not available`,
-        );
-      }
-      if (quantity < sp.minOrderQuantity) {
-        throw new BadRequestException(
-          `Minimum order quantity for "${sp.product.name}" is ${sp.minOrderQuantity}`,
-        );
-      }
-      if (quantity > sp.quantity) {
-        throw new BadRequestException(
-          `Not enough stock for "${sp.product.name}"`,
-        );
-      }
-      const unitPriceMinor = sp.priceMinor;
-      const lineTotalMinor = unitPriceMinor * quantity;
-      const line: PreparedLine = {
-        shopProduct: sp,
-        quantity,
-        unitPriceMinor,
-        lineTotalMinor,
-        productNameSnapshot: sp.product.name.slice(0, 300),
-      };
-      const list = preparedByShop.get(sp.shopId) ?? [];
-      list.push(line);
-      preparedByShop.set(sp.shopId, list);
-    }
-
-    const shopIds = [...preparedByShop.keys()].sort();
-    const shopSubtotal = new Map<string, number>();
-    let globalSubtotal = 0;
-    for (const sid of shopIds) {
-      const sum = (preparedByShop.get(sid) ?? []).reduce(
-        (s, l) => s + l.lineTotalMinor,
-        0,
-      );
-      shopSubtotal.set(sid, sum);
-      globalSubtotal += sum;
-    }
-
-    const totalDeliveryMinor =
-      globalSubtotal >= FREE_DELIVERY_THRESHOLD_MINOR
-        ? 0
-        : DEFAULT_DELIVERY_FEE_MINOR;
-    const deliveryByShop = deliveryShareByShop(
-      shopIds,
-      shopSubtotal,
-      totalDeliveryMinor,
-      globalSubtotal,
-    );
-
     const paymentMethod: OrderPaymentMethod | null =
       dto.paymentMethod ?? null;
 
     const createdOrders: Order[] = [];
 
     await this.dataSource.transaction(async (manager) => {
+      let closeDemandId: string | null = null;
+      let expectedShopId: string | null = null;
+      if (dto.demandInvitationId) {
+        const r =
+          await this.demandInvitationsService.assertAwardedQuotationCheckoutInTx(
+            manager,
+            userId,
+            dto.demandInvitationId,
+            merged,
+          );
+        closeDemandId = r.demandId;
+        expectedShopId = r.expectedShopId;
+      }
+
+      const listings = await manager.getRepository(ShopProduct).find({
+        where: { id: In(ids), isDeleted: false },
+        relations: { shop: true, product: true },
+      });
+      if (listings.length !== ids.length) {
+        throw new BadRequestException('One or more shop products were not found');
+      }
+
+      const byId = new Map(listings.map((s) => [s.id, s] as const));
+      const preparedByShop = new Map<string, PreparedLine[]>();
+
+      for (const [shopProductId, quantity] of merged) {
+        const sp = byId.get(shopProductId)!;
+        if (!sp.isListed) {
+          throw new BadRequestException(
+            `Product listing ${shopProductId} is not available`,
+          );
+        }
+        if (quantity < sp.minOrderQuantity) {
+          throw new BadRequestException(
+            `Minimum order quantity for "${sp.product.name}" is ${sp.minOrderQuantity}`,
+          );
+        }
+        if (quantity > sp.quantity) {
+          throw new BadRequestException(
+            `Not enough stock for "${sp.product.name}"`,
+          );
+        }
+        const unitPriceMinor = sp.priceMinor;
+        const lineTotalMinor = unitPriceMinor * quantity;
+        const line: PreparedLine = {
+          shopProduct: sp,
+          quantity,
+          unitPriceMinor,
+          lineTotalMinor,
+          productNameSnapshot: sp.product.name.slice(0, 300),
+        };
+        const list = preparedByShop.get(sp.shopId) ?? [];
+        list.push(line);
+        preparedByShop.set(sp.shopId, list);
+      }
+
+      const shopIds = [...preparedByShop.keys()].sort();
+      if (expectedShopId != null) {
+        if (shopIds.length !== 1 || shopIds[0] !== expectedShopId) {
+          throw new BadRequestException(
+            'Checkout from a quotation must include only items from that shop',
+          );
+        }
+      }
+
+      const shopSubtotal = new Map<string, number>();
+      let globalSubtotal = 0;
+      for (const sid of shopIds) {
+        const sum = (preparedByShop.get(sid) ?? []).reduce(
+          (s, l) => s + l.lineTotalMinor,
+          0,
+        );
+        shopSubtotal.set(sid, sum);
+        globalSubtotal += sum;
+      }
+
+      const totalDeliveryMinor =
+        globalSubtotal >= FREE_DELIVERY_THRESHOLD_MINOR
+          ? 0
+          : DEFAULT_DELIVERY_FEE_MINOR;
+      const deliveryByShop = deliveryShareByShop(
+        shopIds,
+        shopSubtotal,
+        totalDeliveryMinor,
+        globalSubtotal,
+      );
+
+      const sourceInvitationId = dto.demandInvitationId ?? null;
+
       for (const shopId of shopIds) {
         const lines = preparedByShop.get(shopId)!;
         const itemsSubtotalMinor = shopSubtotal.get(shopId) ?? 0;
@@ -240,6 +269,7 @@ export class OrdersService {
           totalMinor,
           paymentMethod,
           deliveredAt: null,
+          sourceDemandInvitationId: sourceInvitationId,
           createdBy: userId,
           updatedBy: userId,
           isDeleted: false,
@@ -274,6 +304,14 @@ export class OrdersService {
         }
 
         createdOrders.push(order);
+      }
+
+      if (closeDemandId) {
+        await this.customerDemandsService.closeDemandAfterQuotationOrder(
+          manager,
+          userId,
+          closeDemandId,
+        );
       }
     });
 

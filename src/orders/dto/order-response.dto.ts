@@ -44,4 +44,10 @@ export class OrderResponseDto {
 
   @ApiProperty({ type: [OrderItemResponseDto] })
   items: OrderItemResponseDto[];
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Present when the order came from a demand quotation checkout.',
+  })
+  sourceDemandInvitationId?: string | null;
 }

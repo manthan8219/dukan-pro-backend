@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CustomerDemandStatus } from '../enums/customer-demand-status.enum';
 import { DemandShopInvitationResponse } from '../enums/demand-shop-invitation-response.enum';
+import { QuotedLineItemResponseDto } from './quoted-line-item-response.dto';
 
 export class ShopDemandInvitationViewDto {
   @ApiProperty({ format: 'uuid' })
@@ -41,4 +42,7 @@ export class ShopDemandInvitationViewDto {
 
   @ApiPropertyOptional()
   respondedAt: Date | null;
+
+  @ApiPropertyOptional({ type: [QuotedLineItemResponseDto] })
+  quotedLineItems?: QuotedLineItemResponseDto[];
 }

@@ -30,4 +30,13 @@ export class PlaceOrdersCheckoutDto {
   @ValidateNested({ each: true })
   @Type(() => CheckoutOrderLineDto)
   items: CheckoutOrderLineDto[];
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'When placing an order from an accepted demand quotation, pass the invitation id. Cart lines must match the quoted SKUs exactly.',
+  })
+  @IsOptional()
+  @IsUUID()
+  demandInvitationId?: string;
 }

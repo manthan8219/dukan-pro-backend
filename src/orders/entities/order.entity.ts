@@ -72,6 +72,13 @@ export class Order extends BaseEntity {
   @Column({ type: 'timestamptz', nullable: true })
   deliveredAt: Date | null;
 
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'When placed via an accepted demand quotation.',
+  })
+  @Column({ type: 'uuid', nullable: true })
+  sourceDemandInvitationId: string | null;
+
   @OneToMany(() => OrderItem, (i) => i.order, { cascade: true })
   items: OrderItem[];
 }

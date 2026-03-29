@@ -13,6 +13,7 @@ import { UserCustomerDemandsController } from './user-customer-demands.controlle
 import { CustomerDemandAudit } from './entities/customer-demand-audit.entity';
 import { CustomerDemand } from './entities/customer-demand.entity';
 import { DemandShopInvitation } from './entities/demand-shop-invitation.entity';
+import { ShopProduct } from '../shop-products/entities/shop-product.entity';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { DemandShopInvitation } from './entities/demand-shop-invitation.entity';
       CustomerDemand,
       CustomerDemandAudit,
       DemandShopInvitation,
+      ShopProduct,
     ]),
     UsersModule,
     ContentModule,

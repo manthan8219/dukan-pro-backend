@@ -1,11 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { DemandQuotationLineItemSubmitDto } from './demand-quotation-line-item.dto';
 
 export class SubmitDemandQuotationDto {
   @ApiProperty({
@@ -24,4 +29,16 @@ export class SubmitDemandQuotationDto {
   @IsOptional()
   @IsUUID()
   quotationDocumentContentId?: string | null;
+
+  @ApiPropertyOptional({
+    type: [DemandQuotationLineItemSubmitDto],
+    description:
+      'Listed SKUs and quantities for this quote. Required for the customer to check out from the quotation.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(80)
+  @ValidateNested({ each: true })
+  @Type(() => DemandQuotationLineItemSubmitDto)
+  lineItems?: DemandQuotationLineItemSubmitDto[];
 }

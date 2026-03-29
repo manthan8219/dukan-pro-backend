@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { QuotedLineItemResponseDto } from './quoted-line-item-response.dto';
 
 export class CustomerDemandQuotationDto {
   @ApiProperty({ format: 'uuid' })
@@ -18,4 +19,10 @@ export class CustomerDemandQuotationDto {
 
   @ApiProperty()
   respondedAt: Date;
+
+  @ApiPropertyOptional({
+    type: [QuotedLineItemResponseDto],
+    description: 'When set, the customer can proceed to checkout with these lines.',
+  })
+  quotedLineItems?: QuotedLineItemResponseDto[];
 }

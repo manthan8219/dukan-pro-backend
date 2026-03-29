@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { CustomerDemandsModule } from '../customer-demands/customer-demands.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ShopProduct } from '../shop-products/entities/shop-product.entity';
 import { ShopsModule } from '../shops/shops.module';
@@ -24,6 +25,7 @@ import { ShopOwnerOrdersController } from './shop-owner-orders.controller';
     UsersModule,
     ShopsModule,
     NotificationsModule,
+    CustomerDemandsModule,
   ],
   controllers: [
     CustomerOrdersController,

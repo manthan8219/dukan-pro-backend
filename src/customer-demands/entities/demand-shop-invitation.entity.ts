@@ -64,4 +64,11 @@ export class DemandShopInvitation extends BaseEntity {
   })
   @Column({ type: 'uuid', nullable: true })
   respondedByUserId: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Snapshot of listed SKUs offered in this quote (enables customer checkout).',
+  })
+  @Column({ type: 'jsonb', nullable: true })
+  quotedLineItems: unknown | null;
 }
