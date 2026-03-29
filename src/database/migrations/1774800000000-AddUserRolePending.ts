@@ -6,6 +6,12 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 export class AddUserRolePending1774800000000 implements MigrationInterface {
   name = 'AddUserRolePending1774800000000';
 
+  /**
+   * Postgres rejects using a newly added enum value in the same transaction as ADD VALUE
+   * ("unsafe use of new value"). Running this migration without a wrapping transaction fixes that.
+   */
+  transaction = false;
+
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
       `ALTER TYPE "public"."users_role_enum" ADD VALUE 'PENDING'`,

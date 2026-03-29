@@ -11,10 +11,12 @@ import { ShopProduct } from '../shop-products/entities/shop-product.entity';
 import { ShopRating } from '../shop-ratings/entities/shop-rating.entity';
 import { Shop } from '../shops/entities/shop.entity';
 import { User } from '../users/entities/user.entity';
+import { UserDeliveryAddress } from '../user-delivery-addresses/entities/user-delivery-address.entity';
 
 /** Single list used by Nest TypeORM and the migration CLI (`data-source.ts`). */
 export const typeOrmEntities = [
   User,
+  UserDeliveryAddress,
   Shop,
   SellerProfile,
   Product,

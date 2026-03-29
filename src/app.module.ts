@@ -16,6 +16,7 @@ import { ProductsModule } from './products/products.module';
 import { AuthModule } from './auth/auth.module';
 import { CustomerDemandsModule } from './customer-demands/customer-demands.module';
 import { UsersModule } from './users/users.module';
+import { UserDeliveryAddressesModule } from './user-delivery-addresses/user-delivery-addresses.module';
 import { typeOrmEntities } from './database/typeorm-entities';
 
 const skipDb = process.env.SKIP_DB === 'true';
@@ -71,6 +72,7 @@ const skipDb = process.env.SKIP_DB === 'true';
             }),
           }),
           UsersModule,
+          UserDeliveryAddressesModule,
           AuthModule,
           ShopsModule,
           SellerProfileModule,
