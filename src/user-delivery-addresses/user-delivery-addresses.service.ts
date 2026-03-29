@@ -37,7 +37,51 @@ export class UserDeliveryAddressesService {
       tag: row.tag,
       label: row.label,
       isDefault: row.isDefault,
+      latitude: row.latitude,
+      longitude: row.longitude,
     };
+  }
+
+  private coordsFromCreateDto(dto: CreateUserDeliveryAddressDto): {
+    latitude: number | null;
+    longitude: number | null;
+  } {
+    const hasLat = dto.latitude !== undefined;
+    const hasLng = dto.longitude !== undefined;
+    if (hasLat !== hasLng) {
+      throw new BadRequestException(
+        'latitude and longitude must both be provided, or both omitted',
+      );
+    }
+    if (!hasLat) {
+      return { latitude: null, longitude: null };
+    }
+    if (
+      !Number.isFinite(dto.latitude) ||
+      !Number.isFinite(dto.longitude)
+    ) {
+      throw new BadRequestException('latitude and longitude must be finite numbers');
+    }
+    return { latitude: dto.latitude!, longitude: dto.longitude! };
+  }
+
+  private applyCoordinatePatch(
+    row: UserDeliveryAddress,
+    dto: UpdateUserDeliveryAddressDto,
+  ): void {
+    if (dto.latitude === undefined && dto.longitude === undefined) {
+      return;
+    }
+    if (dto.latitude === undefined || dto.longitude === undefined) {
+      throw new BadRequestException(
+        'latitude and longitude must be updated together',
+      );
+    }
+    if (!Number.isFinite(dto.latitude) || !Number.isFinite(dto.longitude)) {
+      throw new BadRequestException('latitude and longitude must be finite numbers');
+    }
+    row.latitude = dto.latitude;
+    row.longitude = dto.longitude;
   }
 
   private resolveLabelOnCreate(
@@ -110,6 +154,7 @@ export class UserDeliveryAddressesService {
       await this.clearDefaultForUser(userId);
     }
     const label = this.resolveLabelOnCreate(dto.tag, dto.label);
+    const coords = this.coordsFromCreateDto(dto);
     const row = this.addressRepository.create({
       userId,
       fullName: dto.fullName.trim(),
@@ -122,6 +167,8 @@ export class UserDeliveryAddressesService {
       tag: dto.tag,
       label,
       isDefault,
+      latitude: coords.latitude,
+      longitude: coords.longitude,
     });
     const saved = await this.addressRepository.save(row);
     return this.toDto(saved);
@@ -161,6 +208,7 @@ export class UserDeliveryAddressesService {
     row.pin = dto.pin !== undefined ? dto.pin.trim() : row.pin;
     row.tag = tag;
     row.label = label;
+    this.applyCoordinatePatch(row, dto);
 
     if (dto.setAsDefault === true) {
       await this.clearDefaultForUser(userId);

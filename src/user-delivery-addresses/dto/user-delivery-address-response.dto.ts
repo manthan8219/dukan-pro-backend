@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DeliveryAddressTag } from '../enums/delivery-address-tag.enum';
 
 export class UserDeliveryAddressResponseDto {
@@ -34,4 +34,10 @@ export class UserDeliveryAddressResponseDto {
 
   @ApiProperty()
   isDefault: boolean;
+
+  @ApiPropertyOptional({ nullable: true, description: 'WGS84 latitude from map pin' })
+  latitude: number | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'WGS84 longitude from map pin' })
+  longitude: number | null;
 }

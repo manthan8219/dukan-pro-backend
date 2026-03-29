@@ -56,4 +56,18 @@ export class UserDeliveryAddress extends BaseEntity {
   })
   @Column({ type: 'boolean', default: false })
   isDefault: boolean;
+
+  @ApiProperty({
+    description: 'Map pin latitude (WGS84). Null for legacy rows.',
+    nullable: true,
+  })
+  @Column({ type: 'double precision', nullable: true })
+  latitude: number | null;
+
+  @ApiProperty({
+    description: 'Map pin longitude (WGS84). Null for legacy rows.',
+    nullable: true,
+  })
+  @Column({ type: 'double precision', nullable: true })
+  longitude: number | null;
 }

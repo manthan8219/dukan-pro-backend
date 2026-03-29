@@ -1,10 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsBoolean,
   IsEnum,
+  IsNumber,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 import { DeliveryAddressTag } from '../enums/delivery-address-tag.enum';
@@ -72,4 +76,24 @@ export class CreateUserDeliveryAddressDto {
   @IsOptional()
   @IsBoolean()
   setAsDefault?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Must be sent together with longitude when set.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  latitude?: number;
+
+  @ApiPropertyOptional({
+    description: 'Must be sent together with latitude when set.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  longitude?: number;
 }
