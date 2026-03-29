@@ -22,6 +22,7 @@ export default new DataSource({
   url: buildPostgresUrl(),
   entities: typeOrmEntities,
   migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
+  migrationsTransactionMode: 'each',
   synchronize: false,
   logging: process.env.TYPEORM_LOGGING === 'true',
 });

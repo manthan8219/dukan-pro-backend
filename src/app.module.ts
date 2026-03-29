@@ -43,6 +43,8 @@ const skipDb = process.env.SKIP_DB === 'true';
                 entities: typeOrmEntities,
                 migrations: [join(__dirname, 'database', 'migrations', '*.js')],
                 migrationsRun: runMigrations,
+                /** One transaction per migration so ADD ENUM VALUE can commit before the next migration uses it. */
+                migrationsTransactionMode: 'each' as const,
                 synchronize: false,
                 retryAttempts: 10,
                 retryDelay: 3000,
