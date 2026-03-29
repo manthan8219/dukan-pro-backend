@@ -18,6 +18,7 @@ import { CustomerDemandsModule } from './customer-demands/customer-demands.modul
 import { UsersModule } from './users/users.module';
 import { UserDeliveryAddressesModule } from './user-delivery-addresses/user-delivery-addresses.module';
 import { StorageModule } from './storage/storage.module';
+import { OrdersModule } from './orders/orders.module';
 import { typeOrmEntities } from './database/typeorm-entities';
 
 const skipDb = process.env.SKIP_DB === 'true';
@@ -87,6 +88,7 @@ const skipDb = process.env.SKIP_DB === 'true';
           ShopProductsModule,
           CustomerDemandsModule,
           StorageModule,
+          OrdersModule,
         ]),
   ],
   controllers: [AppController],
