@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { join } from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ContentModule } from './content/content.module';
@@ -15,6 +16,7 @@ import { ProductsModule } from './products/products.module';
 import { AuthModule } from './auth/auth.module';
 import { CustomerDemandsModule } from './customer-demands/customer-demands.module';
 import { UsersModule } from './users/users.module';
+import { typeOrmEntities } from './database/typeorm-entities';
 
 const skipDb = process.env.SKIP_DB === 'true';
 
@@ -32,18 +34,15 @@ const skipDb = process.env.SKIP_DB === 'true';
             inject: [ConfigService],
             useFactory: (config: ConfigService) => {
               const databaseUrl = config.get<string>('DATABASE_URL');
-              const nodeEnv = config.get<string>('NODE_ENV', 'development');
-              const isProd = nodeEnv === 'production';
-              const syncFlag = config.get<string>('TYPEORM_SYNC');
-              /** Auto-create/alter tables from entities. Off in production; in dev on unless TYPEORM_SYNC=false */
-              const synchronize =
-                !isProd &&
-                syncFlag !== 'false' &&
-                (syncFlag === 'true' || syncFlag === undefined);
+              const runMigrations =
+                config.get<string>('TYPEORM_MIGRATIONS_RUN', 'true') !==
+                'false';
               const base = {
                 type: 'postgres' as const,
-                autoLoadEntities: true,
-                synchronize,
+                entities: typeOrmEntities,
+                migrations: [join(__dirname, 'database', 'migrations', '*.js')],
+                migrationsRun: runMigrations,
+                synchronize: false,
                 retryAttempts: 10,
                 retryDelay: 3000,
               };
