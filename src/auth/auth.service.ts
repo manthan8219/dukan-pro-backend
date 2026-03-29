@@ -72,7 +72,7 @@ export class AuthService {
     if (user.sellerOnboardingComplete && user.role === UserRole.SELLER) {
       return user;
     }
-    return this.usersService.update(user.id, {
+    return this.usersService.updateIgnoringRoleLock(user.id, {
       role: UserRole.SELLER,
       sellerOnboardingComplete: true,
     });

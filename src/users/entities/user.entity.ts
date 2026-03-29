@@ -25,8 +25,8 @@ export class User extends BaseEntity {
   @Column({ type: 'boolean', default: false })
   isVerified: boolean;
 
-  @ApiProperty({ enum: UserRole, default: UserRole.CUSTOMER })
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.CUSTOMER })
+  @ApiProperty({ enum: UserRole, default: UserRole.PENDING })
+  @Column({ type: 'enum', enum: UserRole, default: UserRole.PENDING })
   role: UserRole;
 
   @ApiPropertyOptional({

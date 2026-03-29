@@ -1,5 +1,7 @@
 import {
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -84,7 +86,7 @@ export class UsersService {
         email,
         phoneNumber: phone,
         isVerified: true,
-        role: UserRole.CUSTOMER,
+        role: UserRole.PENDING,
         sellerOnboardingComplete: false,
         lastLoginAt: new Date(),
       });
@@ -117,7 +119,39 @@ export class UsersService {
     return this.usersRepository.save(existing);
   }
 
+  /**
+   * PATCH /users/:id — blocks changing `role` once it is no longer {@link UserRole.PENDING}.
+   */
   async update(id: string, dto: UpdateUserDto): Promise<User> {
+    const user = await this.findOne(id);
+    if (dto.role !== undefined && dto.role !== user.role) {
+      if (user.role !== UserRole.PENDING) {
+        throw new ForbiddenException(
+          'Your role is already set and cannot be changed.',
+        );
+      }
+      if (dto.role === UserRole.PENDING) {
+        throw new BadRequestException(
+          'Choose customer or seller to continue.',
+        );
+      }
+    }
+    Object.assign(user, dto);
+    try {
+      return await this.usersRepository.save(user);
+    } catch (err: unknown) {
+      if (this.isUniqueViolation(err)) {
+        throw new ConflictException('A user with this email already exists');
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Internal updates (reconciliation, seller-profile promotion) that may change role
+   * even when the user is not {@link UserRole.PENDING}.
+   */
+  async updateIgnoringRoleLock(id: string, dto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
     Object.assign(user, dto);
     try {

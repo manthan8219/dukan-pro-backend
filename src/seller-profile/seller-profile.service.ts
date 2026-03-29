@@ -34,7 +34,9 @@ export class SellerProfileService {
 
     // Upgrade the user's role to SELLER if not already
     if (user.role !== UserRole.SELLER) {
-      await this.usersService.update(dto.userId, { role: UserRole.SELLER });
+      await this.usersService.updateIgnoringRoleLock(dto.userId, {
+        role: UserRole.SELLER,
+      });
     }
 
     const profile = this.sellerProfileRepository.create({
