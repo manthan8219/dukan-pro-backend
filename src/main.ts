@@ -6,20 +6,13 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import compression from 'compression';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { resolveFrontendOrigins } from './config/frontend-origins';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  const rawOrigins = process.env.FRONTEND_ORIGIN;
-  const frontendOrigins = rawOrigins
-    ? rawOrigins
-        .split(',')
-        .map((o) => o.trim().replace(/\/+$/, ''))
-        .filter(Boolean)
-    : [];
-  const defaultDevOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
   app.enableCors({
-    origin: frontendOrigins.length ? frontendOrigins : defaultDevOrigins,
+    origin: resolveFrontendOrigins(),
     credentials: true,
   });
 

@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Column, Entity } from 'typeorm';
 import { BaseEntity } from '../../commons/entities/base.entity';
-import { UserRole } from '../enums/user-role.enum';
 
 @Entity('users')
 export class User extends BaseEntity {
@@ -25,14 +24,19 @@ export class User extends BaseEntity {
   @Column({ type: 'boolean', default: false })
   isVerified: boolean;
 
-  @ApiPropertyOptional({
-    enum: UserRole,
-    description:
-      'Null until the user chooses customer or seller; then locked (see PATCH /users/:id).',
-    nullable: true,
+  @ApiProperty({
+    description: 'User may use the buyer app (discover shops, orders, etc.).',
+    default: false,
   })
-  @Column({ type: 'enum', enum: UserRole, nullable: true })
-  role: UserRole | null;
+  @Column({ type: 'boolean', default: false })
+  isCustomer: boolean;
+
+  @ApiProperty({
+    description: 'User may use the seller hub (shop, inventory, etc.).',
+    default: false,
+  })
+  @Column({ type: 'boolean', default: false })
+  isSeller: boolean;
 
   @ApiPropertyOptional({
     description:

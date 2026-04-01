@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,7 +9,6 @@ import { QueryFailedError, Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
-import { UserRole } from './enums/user-role.enum';
 
 @Injectable()
 export class UsersService {
@@ -20,7 +18,11 @@ export class UsersService {
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
-    const user = this.usersRepository.create(dto);
+    const user = this.usersRepository.create({
+      ...dto,
+      isCustomer: dto.isCustomer ?? false,
+      isSeller: dto.isSeller ?? false,
+    });
     try {
       return await this.usersRepository.save(user);
     } catch (err: unknown) {
@@ -39,20 +41,12 @@ export class UsersService {
     return user;
   }
 
-  async findUserIdsByRole(role: UserRole): Promise<string[]> {
-    const rows = await this.usersRepository.find({
-      where: { role },
-      select: { id: true },
-    });
-    return rows.map((r) => r.id);
-  }
-
-  /** Sellers by role or anyone who finished shop onboarding (may still be CUSTOMER in profile). */
+  /** Sellers for monthly insights: explicit seller flag or completed shop onboarding. */
   async findUserIdsForSellerInsights(): Promise<string[]> {
     const rows = await this.usersRepository
       .createQueryBuilder('u')
       .select('u.id', 'id')
-      .where('u.role = :r', { r: UserRole.SELLER })
+      .where('u.isSeller = true')
       .orWhere('u.sellerOnboardingComplete = true')
       .getRawMany<{ id: string }>();
     const ids = rows.map((r) => String(r.id));
@@ -86,7 +80,8 @@ export class UsersService {
         email,
         phoneNumber: phone,
         isVerified: true,
-        role: null,
+        isCustomer: false,
+        isSeller: false,
         sellerOnboardingComplete: false,
         lastLoginAt: new Date(),
       });
@@ -120,20 +115,11 @@ export class UsersService {
   }
 
   /**
-   * PATCH /users/:id — blocks changing `role` once it has been set (non-null).
+   * PATCH /users/:id — may add or remove buyer/seller capabilities; cannot clear both.
    */
   async update(id: string, dto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
-    if (dto.role === null) {
-      throw new BadRequestException('Role cannot be cleared.');
-    }
-    if (dto.role !== undefined && dto.role !== user.role) {
-      if (user.role != null) {
-        throw new ForbiddenException(
-          'Your role is already set and cannot be changed.',
-        );
-      }
-    }
+    this.assertKeepsOneCapability(user, dto);
     Object.assign(user, dto);
     try {
       return await this.usersRepository.save(user);
@@ -146,11 +132,12 @@ export class UsersService {
   }
 
   /**
-   * Internal updates (reconciliation, seller-profile promotion) that may change role
-   * even when it was already set.
+   * Internal updates (reconciliation, seller-profile promotion) that may change flags
+   * even when a public PATCH would be constrained the same way.
    */
   async updateIgnoringRoleLock(id: string, dto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
+    this.assertKeepsOneCapability(user, dto);
     Object.assign(user, dto);
     try {
       return await this.usersRepository.save(user);
@@ -159,6 +146,22 @@ export class UsersService {
         throw new ConflictException('A user with this email already exists');
       }
       throw err;
+    }
+  }
+
+  private assertKeepsOneCapability(user: User, dto: UpdateUserDto): void {
+    const touches =
+      dto.isCustomer !== undefined || dto.isSeller !== undefined;
+    if (!touches) {
+      return;
+    }
+    const nextCustomer =
+      dto.isCustomer !== undefined ? dto.isCustomer : user.isCustomer;
+    const nextSeller = dto.isSeller !== undefined ? dto.isSeller : user.isSeller;
+    if (!nextCustomer && !nextSeller) {
+      throw new BadRequestException(
+        'Keep at least one of isCustomer or isSeller enabled.',
+      );
     }
   }
 

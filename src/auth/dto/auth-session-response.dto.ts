@@ -1,16 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { UserRole } from '../../users/enums/user-role.enum';
 
 export class AuthSessionResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
   @ApiProperty({
-    enum: UserRole,
-    nullable: true,
-    description: 'Null until the user selects customer or seller on first sign-in.',
+    description: 'Buyer-app capability (discover shops, orders, etc.).',
   })
-  role!: UserRole | null;
+  isCustomer!: boolean;
+
+  @ApiProperty({
+    description: 'Seller-hub capability (shop dashboard, inventory, etc.).',
+  })
+  isSeller!: boolean;
 
   @ApiProperty()
   sellerOnboardingComplete!: boolean;

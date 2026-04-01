@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { UserRole } from '../users/enums/user-role.enum';
 import { UsersService } from '../users/users.service';
 import { CreateSellerProfileDto } from './dto/create-seller-profile.dto';
 import { UpdateSellerProfileDto } from './dto/update-seller-profile.dto';
@@ -32,10 +31,9 @@ export class SellerProfileService {
       );
     }
 
-    // Upgrade the user's role to SELLER if not already
-    if (user.role !== UserRole.SELLER) {
+    if (!user.isSeller) {
       await this.usersService.updateIgnoringRoleLock(dto.userId, {
-        role: UserRole.SELLER,
+        isSeller: true,
       });
     }
 

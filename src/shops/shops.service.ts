@@ -6,7 +6,6 @@ import type { Gst } from '../commons/types/gst.types';
 import type { Location } from '../commons/types/location.types';
 import { effectiveMaxServiceRadiusKmForOrder } from '../shop-delivery-radius-rules/effective-radius.util';
 import { ShopDeliveryRadiusRule } from '../shop-delivery-radius-rules/entities/shop-delivery-radius-rule.entity';
-import { UserRole } from '../users/enums/user-role.enum';
 import { UsersService } from '../users/users.service';
 import { CreateShopDto } from './dto/create-shop.dto';
 import { ShopNearbySummaryDto } from './dto/shop-nearby-summary.dto';
@@ -41,7 +40,7 @@ export class ShopsService {
     });
     const saved = await this.shopsRepository.save(shop);
     await this.usersService.update(userId, {
-      role: UserRole.SELLER,
+      isSeller: true,
       sellerOnboardingComplete: true,
     });
     return saved;

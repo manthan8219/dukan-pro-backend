@@ -18,6 +18,7 @@ import {
   ScannerClientRole,
   ScannerSessionService,
 } from './scanner-session.service';
+import { resolveFrontendOrigins } from '../config/frontend-origins';
 
 export type JoinSessionPayload = {
   sessionId: string;
@@ -29,21 +30,9 @@ export type ScanPayload = {
   barcode: string;
 };
 
-function socketCorsOrigins(): string[] | true {
-  const raw = process.env.FRONTEND_ORIGIN;
-  if (!raw) {
-    return ['http://localhost:5173', 'http://127.0.0.1:5173'];
-  }
-  const list = raw
-    .split(',')
-    .map((o) => o.trim().replace(/\/+$/, ''))
-    .filter(Boolean);
-  return list.length ? list : true;
-}
-
 @WebSocketGateway({
   cors: {
-    origin: socketCorsOrigins(),
+    origin: resolveFrontendOrigins(),
     credentials: true,
   },
 })

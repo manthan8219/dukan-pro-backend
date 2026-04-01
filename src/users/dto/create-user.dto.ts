@@ -1,13 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsEmail,
-  IsEnum,
   IsOptional,
   IsString,
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { UserRole } from '../enums/user-role.enum';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'Ada' })
@@ -33,8 +32,13 @@ export class CreateUserDto {
   @MaxLength(32)
   phoneNumber: string;
 
-  @ApiPropertyOptional({ enum: UserRole, default: UserRole.CUSTOMER })
+  @ApiPropertyOptional({ description: 'Buyer-app capability', default: false })
   @IsOptional()
-  @IsEnum(UserRole)
-  role?: UserRole;
+  @IsBoolean()
+  isCustomer?: boolean;
+
+  @ApiPropertyOptional({ description: 'Seller-hub capability', default: false })
+  @IsOptional()
+  @IsBoolean()
+  isSeller?: boolean;
 }

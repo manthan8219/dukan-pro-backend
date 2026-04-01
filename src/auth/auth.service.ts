@@ -2,7 +2,6 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as admin from 'firebase-admin';
 import { User } from '../users/entities/user.entity';
-import { UserRole } from '../users/enums/user-role.enum';
 import { UsersService } from '../users/users.service';
 import { ShopsService } from '../shops/shops.service';
 import type { SyncAuthDto } from './dto/sync-auth.dto';
@@ -58,7 +57,8 @@ export class AuthService {
   private toSession(user: User): AuthSessionResponseDto {
     return {
       id: user.id,
-      role: user.role,
+      isCustomer: user.isCustomer,
+      isSeller: user.isSeller,
       sellerOnboardingComplete: user.sellerOnboardingComplete,
     };
   }
@@ -69,11 +69,11 @@ export class AuthService {
     if (shops.length === 0) {
       return user;
     }
-    if (user.sellerOnboardingComplete && user.role === UserRole.SELLER) {
+    if (user.sellerOnboardingComplete && user.isSeller) {
       return user;
     }
     return this.usersService.updateIgnoringRoleLock(user.id, {
-      role: UserRole.SELLER,
+      isSeller: true,
       sellerOnboardingComplete: true,
     });
   }
