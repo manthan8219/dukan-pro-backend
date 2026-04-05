@@ -9,12 +9,17 @@ import { ShopContentLink } from '../shop-content/entities/shop-content-link.enti
 import { ShopDeliveryRadiusRule } from '../shop-delivery-radius-rules/entities/shop-delivery-radius-rule.entity';
 import { ShopProduct } from '../shop-products/entities/shop-product.entity';
 import { ShopRating } from '../shop-ratings/entities/shop-rating.entity';
+import { ShopDeliveryFeeRule } from '../shops/entities/shop-delivery-fee-rule.entity';
+import { ShopDeliverySlot } from '../shops/entities/shop-delivery-slot.entity';
+import { ShopOpeningHour } from '../shops/entities/shop-opening-hour.entity';
 import { Shop } from '../shops/entities/shop.entity';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../user-roles/entities/user-role.entity';
 import { UserDeliveryAddress } from '../user-delivery-addresses/entities/user-delivery-address.entity';
 import { OrderItem } from '../orders/entities/order-item.entity';
 import { Order } from '../orders/entities/order.entity';
+import { ShopSubscription } from '../subscriptions/entities/shop-subscription.entity';
+import { SubscriptionPlan } from '../subscriptions/entities/subscription-plan.entity';
 
 /** Single list used by Nest TypeORM and the migration CLI (`data-source.ts`). */
 export const typeOrmEntities = [
@@ -22,6 +27,9 @@ export const typeOrmEntities = [
   UserRole,
   UserDeliveryAddress,
   Shop,
+  ShopDeliveryFeeRule,
+  ShopDeliverySlot,
+  ShopOpeningHour,
   SellerProfile,
   Product,
   ShopProduct,
@@ -35,4 +43,6 @@ export const typeOrmEntities = [
   CustomerDemandAudit,
   Order,
   OrderItem,
+  SubscriptionPlan,
+  ShopSubscription,
 ];

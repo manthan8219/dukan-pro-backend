@@ -11,6 +11,7 @@ import { ShopContentModule } from './shop-content/shop-content.module';
 import { ShopDeliveryRadiusRulesModule } from './shop-delivery-radius-rules/shop-delivery-radius-rules.module';
 import { ShopRatingsModule } from './shop-ratings/shop-ratings.module';
 import { ShopProductsModule } from './shop-products/shop-products.module';
+import { ShopOnboardingModule } from './shop-onboarding/shop-onboarding.module';
 import { ShopsModule } from './shops/shops.module';
 import { ProductsModule } from './products/products.module';
 import { AuthModule } from './auth/auth.module';
@@ -21,6 +22,7 @@ import { UserDeliveryAddressesModule } from './user-delivery-addresses/user-deli
 import { StorageModule } from './storage/storage.module';
 import { OrdersModule } from './orders/orders.module';
 import { ScannerSessionModule } from './scanner-session/scanner-session.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { typeOrmEntities } from './database/typeorm-entities';
 
 const skipDb = process.env.SKIP_DB === 'true';
@@ -83,6 +85,7 @@ const skipDb = process.env.SKIP_DB === 'true';
           UserDeliveryAddressesModule,
           AuthModule,
           ShopsModule,
+          ShopOnboardingModule,
           SellerProfileModule,
           ShopDeliveryRadiusRulesModule,
           ShopRatingsModule,
@@ -93,6 +96,7 @@ const skipDb = process.env.SKIP_DB === 'true';
           CustomerDemandsModule,
           StorageModule,
           OrdersModule,
+          SubscriptionsModule,
         ]),
   ],
   controllers: [AppController],

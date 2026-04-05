@@ -6,13 +6,19 @@ import {
   ParseUUIDPipe,
   Patch,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
+import { User } from '../users/entities/user.entity';
 import { NearbyShopsQueryDto } from './dto/nearby-shops-query.dto';
 import { ShopNearbySummaryDto } from './dto/shop-nearby-summary.dto';
 import { UpdateShopDto } from './dto/update-shop.dto';
@@ -41,6 +47,20 @@ export class ShopsController {
       query.longitude,
       orderAmt,
     );
+  }
+
+  @Get('me')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'List shops owned by the signed-in user',
+    description:
+      'Send `Authorization: Bearer <Firebase ID token>`. Returns the caller’s shops, newest first.',
+  })
+  @ApiOkResponse({ type: Shop, isArray: true })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing token' })
+  findMine(@CurrentUser() user: User): Promise<Shop[]> {
+    return this.shopsService.findByUserId(user.id);
   }
 
   @Get(':id')

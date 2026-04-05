@@ -1,6 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import type { Contact } from '../commons/types/contact.types';
 import type { Gst } from '../commons/types/gst.types';
 import type { Location } from '../commons/types/location.types';
@@ -26,6 +31,8 @@ export class ShopsService {
 
   async create(userId: string, dto: CreateShopDto): Promise<Shop> {
     await this.usersService.findOne(userId);
+    this.assertOrderingDeliveryLimits(dto.orderingDelivery);
+    const od = this.resolveOrderingDeliveryColumns(dto.orderingDelivery);
     const shop = this.shopsRepository.create({
       userId,
       name: dto.name,
@@ -37,8 +44,35 @@ export class ShopsService {
       gst: this.buildGst(dto.gst),
       notes: dto.notes ?? null,
       isActive: dto.isActive ?? true,
+      ...od,
     });
     return this.shopsRepository.save(shop);
+  }
+
+  /** Create shop inside an existing transaction (onboarding, imports, …). */
+  async createWithManager(
+    manager: EntityManager,
+    userId: string,
+    dto: CreateShopDto,
+  ): Promise<Shop> {
+    await this.usersService.findOne(userId);
+    this.assertOrderingDeliveryLimits(dto.orderingDelivery);
+    const od = this.resolveOrderingDeliveryColumns(dto.orderingDelivery);
+    const repo = manager.getRepository(Shop);
+    const shop = repo.create({
+      userId,
+      name: dto.name,
+      displayName: dto.displayName,
+      billingName: dto.billingName,
+      location: this.buildLocation(dto.location),
+      offering: this.buildOffering(dto.offering),
+      contact: this.buildContact(dto.contact),
+      gst: this.buildGst(dto.gst),
+      notes: dto.notes ?? null,
+      isActive: dto.isActive ?? true,
+      ...od,
+    });
+    return repo.save(shop);
   }
 
   async findByUserId(userId: string): Promise<Shop[]> {
@@ -55,6 +89,14 @@ export class ShopsService {
     });
     if (!shop) {
       throw new NotFoundException(`Shop ${id} not found`);
+    }
+    return shop;
+  }
+
+  async findOneOwnedByUser(shopId: string, userId: string): Promise<Shop> {
+    const shop = await this.findOne(shopId);
+    if (shop.userId !== userId) {
+      throw new ForbiddenException('You do not have access to this shop');
     }
     return shop;
   }
@@ -175,6 +217,38 @@ export class ShopsService {
     if (dto.gst !== undefined) {
       shop.gst = this.mergeGst(shop.gst, dto.gst);
     }
+    if (dto.orderingDelivery !== undefined) {
+      const nextMin =
+        dto.orderingDelivery.minOrderAmountMinor !== undefined
+          ? dto.orderingDelivery.minOrderAmountMinor
+          : shop.minOrderAmountMinor;
+      const nextMax =
+        dto.orderingDelivery.maxOrderAmountMinor !== undefined
+          ? dto.orderingDelivery.maxOrderAmountMinor
+          : shop.maxOrderAmountMinor;
+      if (nextMin != null && nextMax != null && nextMax < nextMin) {
+        throw new BadRequestException(
+          'orderingDelivery.maxOrderAmountMinor must be >= minOrderAmountMinor',
+        );
+      }
+      if (dto.orderingDelivery.minOrderAmountMinor !== undefined) {
+        shop.minOrderAmountMinor = dto.orderingDelivery.minOrderAmountMinor;
+      }
+      if (dto.orderingDelivery.maxOrderAmountMinor !== undefined) {
+        shop.maxOrderAmountMinor = dto.orderingDelivery.maxOrderAmountMinor;
+      }
+      if (dto.orderingDelivery.offersFreeDelivery !== undefined) {
+        shop.offersFreeDelivery = dto.orderingDelivery.offersFreeDelivery;
+      }
+      if (dto.orderingDelivery.freeDeliveryMinOrderAmountMinor !== undefined) {
+        shop.freeDeliveryMinOrderAmountMinor =
+          dto.orderingDelivery.freeDeliveryMinOrderAmountMinor;
+      }
+      if (dto.orderingDelivery.defaultDeliveryFeeMinor !== undefined) {
+        shop.defaultDeliveryFeeMinor =
+          dto.orderingDelivery.defaultDeliveryFeeMinor;
+      }
+    }
     return this.shopsRepository.save(shop);
   }
 
@@ -218,6 +292,41 @@ export class ShopsService {
       isGstApplicable: input.isGstApplicable,
       gstNo: input.isGstApplicable ? (input.gstNo ?? null) : null,
     };
+  }
+
+  private resolveOrderingDeliveryColumns(
+    input: CreateShopDto['orderingDelivery'],
+  ): Pick<
+    Shop,
+    | 'minOrderAmountMinor'
+    | 'maxOrderAmountMinor'
+    | 'offersFreeDelivery'
+    | 'freeDeliveryMinOrderAmountMinor'
+    | 'defaultDeliveryFeeMinor'
+  > {
+    return {
+      minOrderAmountMinor: input?.minOrderAmountMinor ?? null,
+      maxOrderAmountMinor: input?.maxOrderAmountMinor ?? null,
+      offersFreeDelivery: input?.offersFreeDelivery ?? false,
+      freeDeliveryMinOrderAmountMinor:
+        input?.freeDeliveryMinOrderAmountMinor ?? null,
+      defaultDeliveryFeeMinor: input?.defaultDeliveryFeeMinor ?? 0,
+    };
+  }
+
+  private assertOrderingDeliveryLimits(
+    input: CreateShopDto['orderingDelivery'],
+  ): void {
+    if (!input) {
+      return;
+    }
+    const min = input.minOrderAmountMinor;
+    const max = input.maxOrderAmountMinor;
+    if (min != null && max != null && max < min) {
+      throw new BadRequestException(
+        'orderingDelivery.maxOrderAmountMinor must be >= minOrderAmountMinor',
+      );
+    }
   }
 
   private mergeLocation(

@@ -4,12 +4,17 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import compression from 'compression';
+import { json, urlencoded } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { resolveFrontendOrigins } from './config/frontend-origins';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  app.use(json({ limit: '5mb' }));
+  app.use(
+    urlencoded({ extended: true, limit: '5mb', parameterLimit: 50000 }),
+  );
 
   app.enableCors({
     origin: resolveFrontendOrigins(),

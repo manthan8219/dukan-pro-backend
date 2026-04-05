@@ -61,6 +61,44 @@ export class Shop extends BaseEntity {
   isActive: boolean;
 
   @ApiPropertyOptional({
+    description: 'Minimum order subtotal the shop accepts (minor units, e.g. paise)',
+    example: 9900,
+  })
+  @Column({ type: 'int', nullable: true })
+  minOrderAmountMinor: number | null;
+
+  @ApiPropertyOptional({
+    description: 'Maximum order subtotal cap; null means no maximum',
+    example: 5000000,
+  })
+  @Column({ type: 'int', nullable: true })
+  maxOrderAmountMinor: number | null;
+
+  @ApiProperty({
+    description: 'Whether the shop can offer free delivery (see freeDeliveryMinOrderAmountMinor)',
+    default: false,
+  })
+  @Column({ type: 'boolean', default: false })
+  offersFreeDelivery: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'When offersFreeDelivery is true: free delivery if subtotal >= this (minor units). Null means every order gets free delivery.',
+    example: 49900,
+  })
+  @Column({ type: 'int', nullable: true })
+  freeDeliveryMinOrderAmountMinor: number | null;
+
+  @ApiProperty({
+    description:
+      'Delivery fee when no shop_delivery_fee_rules tier matches (minor units)',
+    example: 2500,
+    default: 0,
+  })
+  @Column({ type: 'int', default: 0 })
+  defaultDeliveryFeeMinor: number;
+
+  @ApiPropertyOptional({
     description:
       'Average of all active ratings (1–5); null when there are none',
     example: 4.25,

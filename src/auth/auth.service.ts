@@ -68,6 +68,53 @@ export class AuthService {
     );
   }
 
+  /**
+   * Authorize `Authorization: Bearer <token>` where token is a Firebase ID token (JWT),
+   * or when SYNC_AUTH_DEV=true, a raw Firebase UID (non-JWT).
+   */
+  async resolveUserFromBearer(
+    authorizationHeader: string | undefined,
+  ): Promise<User> {
+    if (!authorizationHeader?.toLowerCase().startsWith('bearer ')) {
+      throw new UnauthorizedException('Missing or invalid Authorization header.');
+    }
+    const token = authorizationHeader.slice(7).trim();
+    if (!token) {
+      throw new UnauthorizedException('Missing bearer token.');
+    }
+
+    const devTrust = this.config.get<string>('SYNC_AUTH_DEV') === 'true';
+    const looksLikeJwt = token.split('.').length === 3;
+
+    if (!looksLikeJwt) {
+      if (devTrust) {
+        return this.usersService.upsertFromFirebase({
+          uid: token,
+          email: undefined,
+          displayName: undefined,
+          phoneNumber: undefined,
+        });
+      }
+      throw new UnauthorizedException(
+        'Expected a Firebase ID token. With SYNC_AUTH_DEV=true you may send the Firebase UID as the bearer value.',
+      );
+    }
+
+    await this.ensureFirebaseAdmin();
+    let decoded: admin.auth.DecodedIdToken;
+    try {
+      decoded = await admin.auth().verifyIdToken(token);
+    } catch {
+      throw new UnauthorizedException('Invalid or expired id token.');
+    }
+    return this.usersService.upsertFromFirebase({
+      uid: decoded.uid,
+      email: decoded.email ?? undefined,
+      displayName: decoded.name ?? undefined,
+      phoneNumber: decoded.phone_number ?? undefined,
+    });
+  }
+
   private toSession(user: User): AuthSessionResponseDto {
     return {
       id: user.id,

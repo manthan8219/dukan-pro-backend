@@ -5,6 +5,7 @@ import {
   IsArray,
   IsBoolean,
   IsEmail,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -150,6 +151,60 @@ export class GstDto {
   gstNo?: string | null;
 }
 
+/** Order acceptance limits + delivery fee defaults (amounts in minor units, e.g. paise). */
+export class ShopOrderingDeliveryPolicyDto {
+  @ApiPropertyOptional({
+    description: 'Minimum order subtotal the shop accepts (minor units)',
+    example: 9900,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minOrderAmountMinor?: number | null;
+
+  @ApiPropertyOptional({
+    description: 'Maximum order subtotal cap; omit or null for no maximum',
+    example: 5000000,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  maxOrderAmountMinor?: number | null;
+
+  @ApiPropertyOptional({
+    default: false,
+    description: 'Whether the shop offers free delivery (see freeDeliveryMinOrderAmountMinor)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  offersFreeDelivery?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'When offersFreeDelivery is true: free if subtotal >= this (minor). Null means all orders get free delivery.',
+    example: 49900,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  freeDeliveryMinOrderAmountMinor?: number | null;
+
+  @ApiPropertyOptional({
+    default: 0,
+    description:
+      'Delivery fee when no delivery-fee tier matches (minor units); see shop_delivery_fee_rules',
+    example: 2500,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  defaultDeliveryFeeMinor?: number;
+}
+
 export class CreateShopDto {
   @ApiProperty({ example: 'Sharma General Store' })
   @IsString()
@@ -189,6 +244,12 @@ export class CreateShopDto {
   @ValidateNested()
   @Type(() => GstDto)
   gst: GstDto;
+
+  @ApiPropertyOptional({ type: () => ShopOrderingDeliveryPolicyDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ShopOrderingDeliveryPolicyDto)
+  orderingDelivery?: ShopOrderingDeliveryPolicyDto;
 
   @ApiPropertyOptional()
   @IsOptional()
