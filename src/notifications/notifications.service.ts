@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, EntityManager, In, IsNull, Repository } from 'typeorm';
 import type { DemandShopInvitation } from '../customer-demands/entities/demand-shop-invitation.entity';
 import { Shop } from '../shops/entities/shop.entity';
+import { ShopsService } from '../shops/shops.service';
 import { UsersService } from '../users/users.service';
 import { MarkNotificationsReadDto } from './dto/mark-notifications-read.dto';
 import { NotificationListItemDto } from './dto/notification-list-item.dto';
@@ -23,6 +24,7 @@ export class NotificationsService implements OnModuleInit {
     @InjectRepository(UserNotification)
     private readonly notifRepo: Repository<UserNotification>,
     private readonly usersService: UsersService,
+    private readonly shopsService: ShopsService,
   ) {}
 
   onModuleInit(): void {
@@ -427,7 +429,7 @@ export class NotificationsService implements OnModuleInit {
         timeZone: 'UTC',
       });
 
-      const sellerIds = await this.usersService.findUserIdsForSellerInsights();
+      const sellerIds = await this.shopsService.findUserIdsForSellerInsights();
       for (const userId of sellerIds) {
         await this.recordSellerMonthlyInsightsForUser({
           userId,

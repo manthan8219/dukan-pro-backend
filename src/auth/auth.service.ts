@@ -1,9 +1,10 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as admin from 'firebase-admin';
+import { UserRolesService } from '../user-roles/user-roles.service';
+import { UserRoleKind } from '../user-roles/enums/user-role-kind.enum';
 import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
-import { ShopsService } from '../shops/shops.service';
 import type { SyncAuthDto } from './dto/sync-auth.dto';
 import { AuthSessionResponseDto } from './dto/auth-session-response.dto';
 
@@ -12,10 +13,27 @@ export class AuthService {
   constructor(
     private readonly config: ConfigService,
     private readonly usersService: UsersService,
-    private readonly shopsService: ShopsService,
+    private readonly userRolesService: UserRolesService,
   ) {}
 
   async sync(dto: SyncAuthDto): Promise<AuthSessionResponseDto> {
+    const user = await this.upsertUserFromSyncDto(dto);
+    return this.toSession(user);
+  }
+
+  async createSeller(dto: SyncAuthDto): Promise<AuthSessionResponseDto> {
+    const user = await this.upsertUserFromSyncDto(dto);
+    await this.userRolesService.ensureRole(user.id, UserRoleKind.SELLER);
+    return this.toSession(user);
+  }
+
+  async createCustomer(dto: SyncAuthDto): Promise<AuthSessionResponseDto> {
+    const user = await this.upsertUserFromSyncDto(dto);
+    await this.userRolesService.ensureRole(user.id, UserRoleKind.CUSTOMER);
+    return this.toSession(user);
+  }
+
+  private async upsertUserFromSyncDto(dto: SyncAuthDto): Promise<User> {
     const devTrust = this.config.get<string>('SYNC_AUTH_DEV') === 'true';
 
     if (dto.idToken) {
@@ -26,25 +44,21 @@ export class AuthService {
       } catch {
         throw new UnauthorizedException('Invalid or expired id token.');
       }
-      let user = await this.usersService.upsertFromFirebase({
+      return this.usersService.upsertFromFirebase({
         uid: decoded.uid,
         email: decoded.email ?? dto.email,
         displayName: decoded.name ?? dto.displayName,
         phoneNumber: decoded.phone_number ?? dto.phoneNumber,
       });
-      user = await this.reconcileSellerStateFromShops(user);
-      return this.toSession(user);
     }
 
     if (devTrust && dto.firebaseUid) {
-      let user = await this.usersService.upsertFromFirebase({
+      return this.usersService.upsertFromFirebase({
         uid: dto.firebaseUid,
         email: dto.email,
         displayName: dto.displayName,
         phoneNumber: dto.phoneNumber,
       });
-      user = await this.reconcileSellerStateFromShops(user);
-      return this.toSession(user);
     }
 
     throw new UnauthorizedException(
@@ -57,25 +71,7 @@ export class AuthService {
   private toSession(user: User): AuthSessionResponseDto {
     return {
       id: user.id,
-      isCustomer: user.isCustomer,
-      isSeller: user.isSeller,
-      sellerOnboardingComplete: user.sellerOnboardingComplete,
     };
-  }
-
-  /** If the user already owns shops, treat seller onboarding as done (covers legacy rows). */
-  private async reconcileSellerStateFromShops(user: User): Promise<User> {
-    const shops = await this.shopsService.findByUserId(user.id);
-    if (shops.length === 0) {
-      return user;
-    }
-    if (user.sellerOnboardingComplete && user.isSeller) {
-      return user;
-    }
-    return this.usersService.updateIgnoringRoleLock(user.id, {
-      isSeller: true,
-      sellerOnboardingComplete: true,
-    });
   }
 
   private ensureFirebaseAdmin(): void {

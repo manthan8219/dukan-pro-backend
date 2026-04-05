@@ -20,7 +20,7 @@ export class SellerProfileService {
   ) {}
 
   async create(dto: CreateSellerProfileDto): Promise<SellerProfile> {
-    const user = await this.usersService.findOne(dto.userId);
+    await this.usersService.findOne(dto.userId);
 
     const existing = await this.sellerProfileRepository.findOne({
       where: { userId: dto.userId },
@@ -29,12 +29,6 @@ export class SellerProfileService {
       throw new ConflictException(
         `Seller profile already exists for user ${dto.userId}`,
       );
-    }
-
-    if (!user.isSeller) {
-      await this.usersService.updateIgnoringRoleLock(dto.userId, {
-        isSeller: true,
-      });
     }
 
     const profile = this.sellerProfileRepository.create({

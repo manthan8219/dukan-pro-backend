@@ -1,8 +1,6 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import {
-  IsBoolean,
   IsEmail,
-  IsOptional,
   IsString,
   MaxLength,
   MinLength,
@@ -31,14 +29,4 @@ export class CreateUserDto {
   @MinLength(5)
   @MaxLength(32)
   phoneNumber: string;
-
-  @ApiPropertyOptional({ description: 'Buyer-app capability', default: false })
-  @IsOptional()
-  @IsBoolean()
-  isCustomer?: boolean;
-
-  @ApiPropertyOptional({ description: 'Seller-hub capability', default: false })
-  @IsOptional()
-  @IsBoolean()
-  isSeller?: boolean;
 }

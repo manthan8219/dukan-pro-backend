@@ -24,34 +24,12 @@ export class User extends BaseEntity {
   @Column({ type: 'boolean', default: false })
   isVerified: boolean;
 
-  @ApiProperty({
-    description: 'User may use the buyer app (discover shops, orders, etc.).',
-    default: false,
-  })
-  @Column({ type: 'boolean', default: false })
-  isCustomer: boolean;
-
-  @ApiProperty({
-    description: 'User may use the seller hub (shop, inventory, etc.).',
-    default: false,
-  })
-  @Column({ type: 'boolean', default: false })
-  isSeller: boolean;
-
   @ApiPropertyOptional({
     description:
       'Firebase Authentication UID; links this row to the signed-in Firebase user.',
   })
   @Column({ type: 'varchar', length: 128, unique: true, nullable: true })
   firebaseUid: string | null;
-
-  @ApiPropertyOptional({
-    description:
-      'True after seller shop onboarding is finished (shop created).',
-    default: false,
-  })
-  @Column({ type: 'boolean', default: false })
-  sellerOnboardingComplete: boolean;
 
   // ✅ Track last login (analytics + debugging)
   @Column({ type: 'timestamp', nullable: true })

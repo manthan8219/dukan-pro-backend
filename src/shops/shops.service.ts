@@ -38,12 +38,7 @@ export class ShopsService {
       notes: dto.notes ?? null,
       isActive: dto.isActive ?? true,
     });
-    const saved = await this.shopsRepository.save(shop);
-    await this.usersService.update(userId, {
-      isSeller: true,
-      sellerOnboardingComplete: true,
-    });
-    return saved;
+    return this.shopsRepository.save(shop);
   }
 
   async findByUserId(userId: string): Promise<Shop[]> {
@@ -148,6 +143,17 @@ export class ShopsService {
 
     out.sort((a, b) => a.distanceKm - b.distanceKm);
     return out;
+  }
+
+  /** Distinct user ids that own at least one non-deleted shop. */
+  async findUserIdsForSellerInsights(): Promise<string[]> {
+    const rows = await this.shopsRepository
+      .createQueryBuilder('s')
+      .select('s.userId', 'userId')
+      .where('s.isDeleted = false')
+      .distinct(true)
+      .getRawMany<{ userId: string }>();
+    return [...new Set(rows.map((r) => String(r.userId)))];
   }
 
   async update(id: string, dto: UpdateShopDto): Promise<Shop> {

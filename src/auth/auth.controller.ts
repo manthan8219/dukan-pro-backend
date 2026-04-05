@@ -27,4 +27,32 @@ export class AuthController {
   sync(@Body() dto: SyncAuthDto): Promise<AuthSessionResponseDto> {
     return this.authService.sync(dto);
   }
+
+  @Post('create-seller')
+  @ApiOperation({
+    summary: 'Upsert user from Firebase and ensure SELLER role',
+    description:
+      'Same body and rules as `POST /auth/sync`. After upserting the user, assigns the SELLER role if missing (idempotent on repeat calls).',
+  })
+  @ApiOkResponse({ type: AuthSessionResponseDto })
+  @ApiUnauthorizedResponse({
+    description: 'Missing/invalid token or misconfigured server',
+  })
+  createSeller(@Body() dto: SyncAuthDto): Promise<AuthSessionResponseDto> {
+    return this.authService.createSeller(dto);
+  }
+
+  @Post('create-customer')
+  @ApiOperation({
+    summary: 'Upsert user from Firebase and ensure CUSTOMER role',
+    description:
+      'Same body and rules as `POST /auth/sync`. After upserting the user, assigns the CUSTOMER role if missing (idempotent on repeat calls).',
+  })
+  @ApiOkResponse({ type: AuthSessionResponseDto })
+  @ApiUnauthorizedResponse({
+    description: 'Missing/invalid token or misconfigured server',
+  })
+  createCustomer(@Body() dto: SyncAuthDto): Promise<AuthSessionResponseDto> {
+    return this.authService.createCustomer(dto);
+  }
 }

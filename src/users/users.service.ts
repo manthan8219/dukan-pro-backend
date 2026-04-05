@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -18,11 +17,7 @@ export class UsersService {
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
-    const user = this.usersRepository.create({
-      ...dto,
-      isCustomer: dto.isCustomer ?? false,
-      isSeller: dto.isSeller ?? false,
-    });
+    const user = this.usersRepository.create(dto);
     try {
       return await this.usersRepository.save(user);
     } catch (err: unknown) {
@@ -39,18 +34,6 @@ export class UsersService {
       throw new NotFoundException(`User ${id} not found`);
     }
     return user;
-  }
-
-  /** Sellers for monthly insights: explicit seller flag or completed shop onboarding. */
-  async findUserIdsForSellerInsights(): Promise<string[]> {
-    const rows = await this.usersRepository
-      .createQueryBuilder('u')
-      .select('u.id', 'id')
-      .where('u.isSeller = true')
-      .orWhere('u.sellerOnboardingComplete = true')
-      .getRawMany<{ id: string }>();
-    const ids = rows.map((r) => String(r.id));
-    return [...new Set(ids)];
   }
 
   async findByFirebaseUid(firebaseUid: string): Promise<User | null> {
@@ -80,9 +63,6 @@ export class UsersService {
         email,
         phoneNumber: phone,
         isVerified: true,
-        isCustomer: false,
-        isSeller: false,
-        sellerOnboardingComplete: false,
         lastLoginAt: new Date(),
       });
       try {
@@ -115,11 +95,10 @@ export class UsersService {
   }
 
   /**
-   * PATCH /users/:id — may add or remove buyer/seller capabilities; cannot clear both.
+   * PATCH /users/:id
    */
   async update(id: string, dto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
-    this.assertKeepsOneCapability(user, dto);
     Object.assign(user, dto);
     try {
       return await this.usersRepository.save(user);
@@ -128,40 +107,6 @@ export class UsersService {
         throw new ConflictException('A user with this email already exists');
       }
       throw err;
-    }
-  }
-
-  /**
-   * Internal updates (reconciliation, seller-profile promotion) that may change flags
-   * even when a public PATCH would be constrained the same way.
-   */
-  async updateIgnoringRoleLock(id: string, dto: UpdateUserDto): Promise<User> {
-    const user = await this.findOne(id);
-    this.assertKeepsOneCapability(user, dto);
-    Object.assign(user, dto);
-    try {
-      return await this.usersRepository.save(user);
-    } catch (err: unknown) {
-      if (this.isUniqueViolation(err)) {
-        throw new ConflictException('A user with this email already exists');
-      }
-      throw err;
-    }
-  }
-
-  private assertKeepsOneCapability(user: User, dto: UpdateUserDto): void {
-    const touches =
-      dto.isCustomer !== undefined || dto.isSeller !== undefined;
-    if (!touches) {
-      return;
-    }
-    const nextCustomer =
-      dto.isCustomer !== undefined ? dto.isCustomer : user.isCustomer;
-    const nextSeller = dto.isSeller !== undefined ? dto.isSeller : user.isSeller;
-    if (!nextCustomer && !nextSeller) {
-      throw new BadRequestException(
-        'Keep at least one of isCustomer or isSeller enabled.',
-      );
     }
   }
 

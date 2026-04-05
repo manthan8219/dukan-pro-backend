@@ -15,6 +15,7 @@ import { ShopsModule } from './shops/shops.module';
 import { ProductsModule } from './products/products.module';
 import { AuthModule } from './auth/auth.module';
 import { CustomerDemandsModule } from './customer-demands/customer-demands.module';
+import { UserRolesModule } from './user-roles/user-roles.module';
 import { UsersModule } from './users/users.module';
 import { UserDeliveryAddressesModule } from './user-delivery-addresses/user-delivery-addresses.module';
 import { StorageModule } from './storage/storage.module';
@@ -78,6 +79,7 @@ const skipDb = process.env.SKIP_DB === 'true';
             }),
           }),
           UsersModule,
+          UserRolesModule,
           UserDeliveryAddressesModule,
           AuthModule,
           ShopsModule,
