@@ -40,8 +40,13 @@ export class UsersService {
     return this.usersRepository.findOne({ where: { firebaseUid } });
   }
 
+  async findByEmail(email: string): Promise<User | null> {
+    return this.usersRepository.findOne({ where: { email } });
+  }
+
   /**
    * Creates or updates the Postgres user for a Firebase sign-in.
+   * Resolves by Firebase UID first, then by email (legacy rows without UID or after UID changes).
    */
   async upsertFromFirebase(claims: {
     uid: string;
@@ -49,11 +54,14 @@ export class UsersService {
     displayName?: string | null;
     phoneNumber?: string | null;
   }): Promise<User> {
-    const existing = await this.findByFirebaseUid(claims.uid);
     const email =
       claims.email?.trim() || `${claims.uid}@firebase.dukaanpro.internal`;
     const { firstName, lastName } = splitDisplayName(claims.displayName);
     const phone = claims.phoneNumber?.trim() || '-';
+
+    let existing =
+      (await this.findByFirebaseUid(claims.uid)) ??
+      (await this.findByEmail(email));
 
     if (!existing) {
       const user = this.usersRepository.create({
@@ -69,6 +77,16 @@ export class UsersService {
         return await this.usersRepository.save(user);
       } catch (err: unknown) {
         if (this.isUniqueViolation(err)) {
+          existing =
+            (await this.findByFirebaseUid(claims.uid)) ??
+            (await this.findByEmail(email));
+          if (existing) {
+            return this.mergeFirebaseClaimsIntoUser(existing, claims, {
+              firstName,
+              lastName,
+              phone,
+            });
+          }
           throw new ConflictException(
             'Could not create user (email may already exist).',
           );
@@ -77,21 +95,39 @@ export class UsersService {
       }
     }
 
-    existing.lastLoginAt = new Date();
+    return this.mergeFirebaseClaimsIntoUser(existing, claims, {
+      firstName,
+      lastName,
+      phone,
+    });
+  }
+
+  private mergeFirebaseClaimsIntoUser(
+    user: User,
+    claims: {
+      uid: string;
+      email?: string | null;
+      displayName?: string | null;
+      phoneNumber?: string | null;
+    },
+    parsed: { firstName: string; lastName: string; phone: string },
+  ): Promise<User> {
+    user.firebaseUid = claims.uid;
+    user.lastLoginAt = new Date();
     if (
       claims.email?.trim() &&
-      existing.email.endsWith('@firebase.dukaanpro.internal')
+      user.email.endsWith('@firebase.dukaanpro.internal')
     ) {
-      existing.email = claims.email.trim();
+      user.email = claims.email.trim();
     }
     if (claims.displayName?.trim()) {
-      existing.firstName = firstName;
-      existing.lastName = lastName;
+      user.firstName = parsed.firstName;
+      user.lastName = parsed.lastName;
     }
-    if (claims.phoneNumber?.trim() && existing.phoneNumber === '-') {
-      existing.phoneNumber = phone;
+    if (claims.phoneNumber?.trim() && user.phoneNumber === '-') {
+      user.phoneNumber = parsed.phone;
     }
-    return this.usersRepository.save(existing);
+    return this.usersRepository.save(user);
   }
 
   /**
