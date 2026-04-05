@@ -307,11 +307,10 @@ export class ShopSubscriptionsService {
       };
     }
 
-    if (
-      sub.status === ShopSubscriptionStatus.TRIALING &&
-      effectiveTrialEnd &&
-      now < effectiveTrialEnd
-    ) {
+    // Future trial window (stored `trialEndsAt` and/or inferred from `trialStartedAt`).
+    // Must run before the "need_trial" branch: rows with `trial_ends_at` set but
+    // `trial_started_at` null previously hit ACTIVE && !trialStartedAt and wrongly got need_trial.
+    if (effectiveTrialEnd && now < effectiveTrialEnd) {
       return {
         shopId,
         status: sub.status,
@@ -324,7 +323,12 @@ export class ShopSubscriptionsService {
       };
     }
 
-    if (sub.status === ShopSubscriptionStatus.ACTIVE && !sub.trialStartedAt) {
+    // Seeded FREE plan row: no trial window on record yet — seller must start trial in the app.
+    if (
+      sub.status === ShopSubscriptionStatus.ACTIVE &&
+      !sub.trialStartedAt &&
+      !sub.trialEndsAt
+    ) {
       return {
         shopId,
         status: sub.status,
@@ -348,23 +352,6 @@ export class ShopSubscriptionsService {
         trialStartedAt: sub.trialStartedAt,
         trialEndsAt: effectiveTrialEnd,
         trialDaysRemaining: 0,
-        subscriptionPlanCode: planCode,
-      };
-    }
-
-    if (
-      sub.status === ShopSubscriptionStatus.ACTIVE &&
-      effectiveTrialEnd &&
-      now < effectiveTrialEnd
-    ) {
-      return {
-        shopId,
-        status: sub.status,
-        phase: 'trial_active',
-        hasFeatureAccess: true,
-        trialStartedAt: sub.trialStartedAt,
-        trialEndsAt: effectiveTrialEnd,
-        trialDaysRemaining: computeTrialDaysRemaining(effectiveTrialEnd),
         subscriptionPlanCode: planCode,
       };
     }
