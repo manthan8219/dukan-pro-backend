@@ -2,6 +2,9 @@
 /dist
 /node_modules
 
+# Project uses Yarn 4 (packageManager in package.json); npm lock causes drift vs yarn.lock
+package-lock.json
+
 # Yarn Berry (do not commit unplugged deps or cache)
 .yarn/cache
 .yarn/unplugged
