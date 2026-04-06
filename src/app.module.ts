@@ -23,6 +23,7 @@ import { StorageModule } from './storage/storage.module';
 import { OrdersModule } from './orders/orders.module';
 import { ScannerSessionModule } from './scanner-session/scanner-session.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { KhataModule } from './khata/khata.module';
 import { typeOrmEntities } from './database/typeorm-entities';
 
 const skipDb = process.env.SKIP_DB === 'true';
@@ -97,6 +98,7 @@ const skipDb = process.env.SKIP_DB === 'true';
           StorageModule,
           OrdersModule,
           SubscriptionsModule,
+          KhataModule,
         ]),
   ],
   controllers: [AppController],
