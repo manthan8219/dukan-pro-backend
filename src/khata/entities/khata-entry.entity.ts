@@ -1,19 +1,18 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BaseEntity } from '../../commons/entities/base.entity';
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { KhataBook } from './khata-book.entity';
 import { KhataEntryKind } from '../enums/khata-entry-kind.enum';
-import { ShopCustomer } from './shop-customer.entity';
 
+/**
+ * khataBookId is defined only via {@link khataBook} JoinColumn (no duplicate @Column).
+ */
+/** DB index (khataBookId, createdAt) is created by migrations — not declared here (no khataBookId property). */
 @Entity('khata_entries')
-@Index(['shopCustomerId', 'createdAt'])
 export class KhataEntry extends BaseEntity {
-  @ApiProperty({ format: 'uuid' })
-  @Column({ type: 'uuid' })
-  shopCustomerId: string;
-
-  @ManyToOne(() => ShopCustomer, (c) => c.khataEntries, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'shopCustomerId' })
-  shopCustomer: ShopCustomer;
+  @ManyToOne(() => KhataBook, (b) => b.khataEntries, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'khataBookId' })
+  khataBook: KhataBook;
 
   @ApiProperty({ enum: KhataEntryKind })
   @Column({

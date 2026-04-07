@@ -1,10 +1,13 @@
 import {
   ConflictException,
+  HttpException,
   Injectable,
+  InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { DataSource, Brackets, QueryFailedError, Repository } from 'typeorm';
 import { ShopsService } from '../shops/shops.service';
 import { UsersService } from '../users/users.service';
 import { CreateKhataEntryDto } from './dto/create-khata-entry.dto';
@@ -12,17 +15,23 @@ import { CreateShopCustomerDto } from './dto/create-shop-customer.dto';
 import { KhataEntryResponseDto } from './dto/khata-entry-response.dto';
 import { ShopCustomerResponseDto } from './dto/shop-customer-response.dto';
 import { UpdateShopCustomerDto } from './dto/update-shop-customer.dto';
+import { KhataBook } from './entities/khata-book.entity';
 import { KhataEntry } from './entities/khata-entry.entity';
 import { ShopCustomer } from './entities/shop-customer.entity';
 import { KhataEntryKind } from './enums/khata-entry-kind.enum';
 
 @Injectable()
 export class KhataService {
+  private readonly logger = new Logger(KhataService.name);
+
   constructor(
     @InjectRepository(ShopCustomer)
     private readonly shopCustomersRepository: Repository<ShopCustomer>,
+    @InjectRepository(KhataBook)
+    private readonly khataBooksRepository: Repository<KhataBook>,
     @InjectRepository(KhataEntry)
     private readonly khataEntriesRepository: Repository<KhataEntry>,
+    private readonly dataSource: DataSource,
     private readonly shopsService: ShopsService,
     private readonly usersService: UsersService,
   ) {}
@@ -30,15 +39,60 @@ export class KhataService {
   async listShopCustomers(
     ownerUserId: string,
     shopId: string,
+    search?: string,
   ): Promise<ShopCustomerResponseDto[]> {
-    await this.shopsService.findOneOwnedByUser(shopId, ownerUserId);
-    const customers = await this.shopCustomersRepository.find({
-      where: { shopId, isDeleted: false },
-      order: { displayName: 'ASC', createdAt: 'DESC' },
-    });
-    const ids = customers.map((c) => c.id);
-    const balances = await this.sumOutstandingByCustomerIds(ids);
-    return customers.map((c) => this.toCustomerDto(c, balances.get(c.id) ?? 0));
+    try {
+      await this.shopsService.findOneOwnedByUser(shopId, ownerUserId);
+      await this.ensureKhataBooksForShop(shopId);
+      const raw = search?.trim() ?? '';
+      const safeForLike = raw.replace(/[%_\\]/g, '').trim().slice(0, 120);
+
+      let customers: ShopCustomer[];
+      if (!safeForLike) {
+        customers = await this.shopCustomersRepository.find({
+          where: { shopId, isDeleted: false },
+          order: { displayName: 'ASC', createdAt: 'DESC' },
+        });
+      } else {
+        const like = `%${safeForLike}%`;
+        const digitsOnly = raw.replace(/\D/g, '');
+        const qb = this.shopCustomersRepository
+          .createQueryBuilder('c')
+          .where('c.shopId = :shopId', { shopId })
+          .andWhere('c.isDeleted = false')
+          .andWhere(
+            new Brackets((wb) => {
+              wb.where('c.displayName ILIKE :like', { like }).orWhere(
+                'c.phone ILIKE :like',
+                { like },
+              );
+              if (digitsOnly.length >= 2) {
+                wb.orWhere(
+                  "regexp_replace(COALESCE(c.phone, ''), '[^0-9]', '', 'g') LIKE :digitsLike",
+                  { digitsLike: `%${digitsOnly}%` },
+                );
+              }
+            }),
+          )
+          .orderBy('c.displayName', 'ASC')
+          .addOrderBy('c.createdAt', 'DESC');
+        customers = await qb.getMany();
+      }
+
+      const ids = customers.map((c) => c.id);
+      const balances = await this.balancesByShopCustomerIds(ids);
+      return customers.map((c) => this.toCustomerDto(c, balances.get(c.id) ?? 0));
+    } catch (err) {
+      if (err instanceof HttpException) {
+        throw err;
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : undefined;
+      this.logger.error(`listShopCustomers failed: ${message}`, stack);
+      throw new InternalServerErrorException(
+        'Could not load khata customers. Check server logs.',
+      );
+    }
   }
 
   async getShopCustomer(
@@ -47,8 +101,9 @@ export class KhataService {
     customerId: string,
   ): Promise<ShopCustomerResponseDto> {
     await this.shopsService.findOneOwnedByUser(shopId, ownerUserId);
+    await this.ensureKhataBooksForShop(shopId);
     const customer = await this.requireCustomerInShop(shopId, customerId);
-    const balance = await this.sumOutstandingForCustomer(customerId);
+    const balance = await this.balanceForShopCustomer(customerId);
     return this.toCustomerDto(customer, balance);
   }
 
@@ -84,6 +139,13 @@ export class KhataService {
       this.rethrowUniqueShopUser(e);
       throw e;
     }
+    const book = this.khataBooksRepository.create({
+      shopId,
+      shopCustomer: { id: row.id } as ShopCustomer,
+      userId: row.userId,
+      balanceMinor: 0,
+    });
+    await this.khataBooksRepository.save(book);
     return this.toCustomerDto(row, 0);
   }
 
@@ -94,6 +156,7 @@ export class KhataService {
     dto: UpdateShopCustomerDto,
   ): Promise<ShopCustomerResponseDto> {
     await this.shopsService.findOneOwnedByUser(shopId, ownerUserId);
+    await this.ensureKhataBooksForShop(shopId);
     const customer = await this.requireCustomerInShop(shopId, customerId);
     if (dto.displayName !== undefined) {
       customer.displayName = dto.displayName.trim();
@@ -105,7 +168,13 @@ export class KhataService {
       customer.notes = dto.notes;
     }
     await this.shopCustomersRepository.save(customer);
-    const balance = await this.sumOutstandingForCustomer(customerId);
+    await this.khataBooksRepository
+      .createQueryBuilder()
+      .update(KhataBook)
+      .set({ userId: customer.userId })
+      .where('"shopCustomerId" = :id', { id: customerId })
+      .execute();
+    const balance = await this.balanceForShopCustomer(customerId);
     return this.toCustomerDto(customer, balance);
   }
 
@@ -120,6 +189,12 @@ export class KhataService {
       { id: customerId },
       { isDeleted: true },
     );
+    await this.khataBooksRepository
+      .createQueryBuilder()
+      .update(KhataBook)
+      .set({ isDeleted: true })
+      .where('"shopCustomerId" = :id', { id: customerId })
+      .execute();
   }
 
   async listKhataEntries(
@@ -128,10 +203,13 @@ export class KhataService {
     customerId: string,
   ): Promise<KhataEntryResponseDto[]> {
     await this.shopsService.findOneOwnedByUser(shopId, ownerUserId);
+    await this.ensureKhataBooksForShop(shopId);
     await this.requireCustomerInShop(shopId, customerId);
+    const book = await this.requireKhataBook(shopId, customerId);
     const entries = await this.khataEntriesRepository.find({
-      where: { shopCustomerId: customerId, isDeleted: false },
+      where: { khataBook: { id: book.id }, isDeleted: false },
       order: { createdAt: 'DESC' },
+      relations: ['khataBook', 'khataBook.shopCustomer'],
     });
     return entries.map((e) => this.toEntryDto(e));
   }
@@ -143,18 +221,42 @@ export class KhataService {
     dto: CreateKhataEntryDto,
   ): Promise<KhataEntryResponseDto> {
     await this.shopsService.findOneOwnedByUser(shopId, ownerUserId);
+    await this.ensureKhataBooksForShop(shopId);
     await this.requireCustomerInShop(shopId, customerId);
-    const entry = this.khataEntriesRepository.create({
-      shopCustomerId: customerId,
-      kind: dto.kind,
-      amountMinor: dto.amountMinor,
-      description: dto.description ?? null,
-      referenceType: dto.referenceType ?? null,
-      referenceId: dto.referenceId ?? null,
-      metadata: dto.metadata ?? null,
+    const delta =
+      dto.kind === KhataEntryKind.CREDIT
+        ? dto.amountMinor
+        : -dto.amountMinor;
+
+    return this.dataSource.transaction(async (manager) => {
+      const book = await manager
+        .createQueryBuilder(KhataBook, 'b')
+        .setLock('pessimistic_write')
+        .innerJoin('b.shopCustomer', 'sc')
+        .where('sc.id = :cid', { cid: customerId })
+        .andWhere('b.shopId = :sid', { sid: shopId })
+        .andWhere('b.isDeleted = false')
+        .getOne();
+      if (!book) {
+        throw new NotFoundException('Khata book not found for this customer');
+      }
+      await manager.increment(KhataBook, { id: book.id }, 'balanceMinor', delta);
+      const entry = manager.create(KhataEntry, {
+        khataBook: { id: book.id } as KhataBook,
+        kind: dto.kind,
+        amountMinor: dto.amountMinor,
+        description: dto.description ?? null,
+        referenceType: dto.referenceType ?? null,
+        referenceId: dto.referenceId ?? null,
+        metadata: dto.metadata ?? null,
+      });
+      const saved = await manager.save(entry);
+      const withBook = await manager.findOne(KhataEntry, {
+        where: { id: saved.id },
+        relations: ['khataBook', 'khataBook.shopCustomer'],
+      });
+      return this.toEntryDto(withBook!);
     });
-    const saved = await this.khataEntriesRepository.save(entry);
-    return this.toEntryDto(saved);
   }
 
   async softDeleteKhataEntry(
@@ -164,18 +266,28 @@ export class KhataService {
     entryId: string,
   ): Promise<void> {
     await this.shopsService.findOneOwnedByUser(shopId, ownerUserId);
+    await this.ensureKhataBooksForShop(shopId);
     await this.requireCustomerInShop(shopId, customerId);
-    const entry = await this.khataEntriesRepository.findOne({
-      where: {
-        id: entryId,
-        shopCustomerId: customerId,
-        isDeleted: false,
-      },
+    const book = await this.requireKhataBook(shopId, customerId);
+
+    await this.dataSource.transaction(async (manager) => {
+      const entry = await manager.findOne(KhataEntry, {
+        where: {
+          id: entryId,
+          khataBook: { id: book.id },
+          isDeleted: false,
+        },
+      });
+      if (!entry) {
+        throw new NotFoundException('Khata entry not found');
+      }
+      const reverse =
+        entry.kind === KhataEntryKind.CREDIT
+          ? -entry.amountMinor
+          : entry.amountMinor;
+      await manager.increment(KhataBook, { id: book.id }, 'balanceMinor', reverse);
+      await manager.update(KhataEntry, { id: entryId }, { isDeleted: true });
     });
-    if (!entry) {
-      throw new NotFoundException('Khata entry not found');
-    }
-    await this.khataEntriesRepository.update({ id: entryId }, { isDeleted: true });
   }
 
   private async requireCustomerInShop(
@@ -191,45 +303,78 @@ export class KhataService {
     return customer;
   }
 
-  private async sumOutstandingForCustomer(customerId: string): Promise<number> {
-    const raw = await this.khataEntriesRepository
-      .createQueryBuilder('e')
-      .select(
-        `COALESCE(SUM(CASE WHEN e.kind = :credit THEN e.amountMinor WHEN e.kind = :debit THEN -e.amountMinor ELSE 0 END), 0)`,
-        'balance',
-      )
-      .where('e.shopCustomerId = :customerId', { customerId })
-      .andWhere('e.isDeleted = false')
-      .setParameter('credit', KhataEntryKind.CREDIT)
-      .setParameter('debit', KhataEntryKind.DEBIT)
-      .getRawOne<{ balance: string }>();
-    return Number(raw?.balance ?? 0);
+  private async requireKhataBook(
+    shopId: string,
+    shopCustomerId: string,
+  ): Promise<KhataBook> {
+    const book = await this.khataBooksRepository
+      .createQueryBuilder('b')
+      .innerJoin('b.shopCustomer', 'sc')
+      .where('b.shopId = :sid', { sid: shopId })
+      .andWhere('sc.id = :cid', { cid: shopCustomerId })
+      .andWhere('b.isDeleted = false')
+      .getOne();
+    if (!book) {
+      throw new NotFoundException('Khata book not found');
+    }
+    return book;
   }
 
-  private async sumOutstandingByCustomerIds(
+  /**
+   * Creates missing khata_books rows for active shop_customers (e.g. after a partial migration).
+   */
+  private async ensureKhataBooksForShop(shopId: string): Promise<void> {
+    try {
+      await this.dataSource.query(
+        `INSERT INTO "khata_books" (
+          "createdAt", "updatedAt", "isDeleted",
+          "shopId", "shopCustomerId", "userId", "balanceMinor"
+        )
+        SELECT sc."createdAt", sc."updatedAt", sc."isDeleted",
+               sc."shopId", sc."id", sc."userId", 0
+        FROM "shop_customers" sc
+        WHERE sc."shopId" = $1
+          AND sc."isDeleted" = false
+          AND NOT EXISTS (
+            SELECT 1 FROM "khata_books" kb
+            WHERE kb."shopCustomerId" = sc."id"
+          )`,
+        [shopId],
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.logger.warn(`ensureKhataBooksForShop: ${msg}`);
+    }
+  }
+
+  private async balanceForShopCustomer(shopCustomerId: string): Promise<number> {
+    const row = await this.khataBooksRepository
+      .createQueryBuilder('b')
+      .select('b.balanceMinor', 'balanceMinor')
+      .innerJoin('b.shopCustomer', 'sc')
+      .where('sc.id = :cid', { cid: shopCustomerId })
+      .andWhere('b.isDeleted = false')
+      .getRawOne<{ balanceMinor: string }>();
+    return Number(row?.balanceMinor ?? 0);
+  }
+
+  private async balancesByShopCustomerIds(
     customerIds: string[],
   ): Promise<Map<string, number>> {
-    const map = new Map<string, number>(
-      customerIds.map((id) => [id, 0]),
-    );
+    const map = new Map<string, number>(customerIds.map((id) => [id, 0]));
     if (customerIds.length === 0) {
       return map;
     }
-    const rows = await this.khataEntriesRepository
-      .createQueryBuilder('e')
-      .select('e.shopCustomerId', 'shopCustomerId')
-      .addSelect(
-        `COALESCE(SUM(CASE WHEN e.kind = :credit THEN e.amountMinor WHEN e.kind = :debit THEN -e.amountMinor ELSE 0 END), 0)`,
-        'balance',
-      )
-      .where('e.shopCustomerId IN (:...ids)', { ids: customerIds })
-      .andWhere('e.isDeleted = false')
-      .groupBy('e.shopCustomerId')
-      .setParameter('credit', KhataEntryKind.CREDIT)
-      .setParameter('debit', KhataEntryKind.DEBIT)
-      .getRawMany<{ shopCustomerId: string; balance: string }>();
+    const rows = await this.khataBooksRepository
+      .createQueryBuilder('b')
+      .innerJoin('b.shopCustomer', 'sc')
+      .select('sc.id', 'shopCustomerId')
+      .addSelect('b.balanceMinor', 'balanceMinor')
+      .where('sc.id IN (:...ids)', { ids: customerIds })
+      .andWhere('b.isDeleted = false')
+      .getRawMany<{ shopCustomerId: string; balanceMinor: string }>();
     for (const row of rows) {
-      map.set(row.shopCustomerId, Number(row.balance));
+      map.set(row.shopCustomerId, Number(row.balanceMinor));
     }
     return map;
   }
@@ -252,9 +397,16 @@ export class KhataService {
   }
 
   private toEntryDto(e: KhataEntry): KhataEntryResponseDto {
+    const shopCustomerId = e.khataBook?.shopCustomer?.id;
+    if (!shopCustomerId) {
+      this.logger.error(
+        `toEntryDto: missing khataBook.shopCustomer for entry ${e.id}`,
+      );
+      throw new InternalServerErrorException('Khata entry response mapping failed');
+    }
     return {
       id: e.id,
-      shopCustomerId: e.shopCustomerId,
+      shopCustomerId,
       kind: e.kind,
       amountMinor: e.amountMinor,
       description: e.description,

@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiCreatedResponse,
@@ -16,6 +17,7 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { CreateKhataEntryDto } from './dto/create-khata-entry.dto';
@@ -32,13 +34,20 @@ export class ShopOwnerKhataController {
 
   @Get('customers')
   @ApiOperation({ summary: 'List khata customers for a shop (owner only)' })
+  @ApiQuery({
+    name: 'q',
+    required: false,
+    description:
+      'Filter by display name or phone (substring match; phone also matches digits-only)',
+  })
   @ApiOkResponse({ type: ShopCustomerResponseDto, isArray: true })
   @ApiForbiddenResponse({ description: 'Not the shop owner' })
   listCustomers(
     @Param('userId', ParseUUIDPipe) ownerUserId: string,
     @Param('shopId', ParseUUIDPipe) shopId: string,
+    @Query('q') q?: string,
   ): Promise<ShopCustomerResponseDto[]> {
-    return this.khataService.listShopCustomers(ownerUserId, shopId);
+    return this.khataService.listShopCustomers(ownerUserId, shopId, q);
   }
 
   @Post('customers')

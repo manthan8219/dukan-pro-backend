@@ -2,6 +2,7 @@ import { Content } from '../content/entities/content.entity';
 import { CustomerDemandAudit } from '../customer-demands/entities/customer-demand-audit.entity';
 import { CustomerDemand } from '../customer-demands/entities/customer-demand.entity';
 import { DemandShopInvitation } from '../customer-demands/entities/demand-shop-invitation.entity';
+import { KhataBook } from '../khata/entities/khata-book.entity';
 import { KhataEntry } from '../khata/entities/khata-entry.entity';
 import { ShopCustomer } from '../khata/entities/shop-customer.entity';
 import { UserNotification } from '../notifications/entities/user-notification.entity';
@@ -48,5 +49,6 @@ export const typeOrmEntities = [
   SubscriptionPlan,
   ShopSubscription,
   ShopCustomer,
+  KhataBook,
   KhataEntry,
 ];

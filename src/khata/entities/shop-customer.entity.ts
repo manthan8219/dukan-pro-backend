@@ -2,8 +2,15 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BaseEntity } from '../../commons/entities/base.entity';
 import { Shop } from '../../shops/entities/shop.entity';
 import { User } from '../../users/entities/user.entity';
-import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
-import { KhataEntry } from './khata-entry.entity';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  OneToOne,
+} from 'typeorm';
+import { KhataBook } from './khata-book.entity';
 
 @Entity('shop_customers')
 @Index(['shopId'])
@@ -40,6 +47,6 @@ export class ShopCustomer extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   notes: string | null;
 
-  @OneToMany(() => KhataEntry, (e) => e.shopCustomer)
-  khataEntries: KhataEntry[];
+  @OneToOne(() => KhataBook, (b) => b.shopCustomer)
+  khataBook: KhataBook | null;
 }
