@@ -36,6 +36,11 @@ export class KhataService {
     private readonly usersService: UsersService,
   ) {}
 
+  /**
+   * Returns one DTO per shop customer, driven by khata_books so the balance
+   * (already denormalized in balanceMinor) is read in a single JOIN — no
+   * separate aggregation step and no risk of duplicate rows.
+   */
   async listShopCustomers(
     ownerUserId: string,
     shopId: string,
@@ -44,44 +49,40 @@ export class KhataService {
     try {
       await this.shopsService.findOneOwnedByUser(shopId, ownerUserId);
       await this.ensureKhataBooksForShop(shopId);
+
       const raw = search?.trim() ?? '';
       const safeForLike = raw.replace(/[%_\\]/g, '').trim().slice(0, 120);
 
-      let customers: ShopCustomer[];
-      if (!safeForLike) {
-        customers = await this.shopCustomersRepository.find({
-          where: { shopId, isDeleted: false },
-          order: { displayName: 'ASC', createdAt: 'DESC' },
-        });
-      } else {
+      const qb = this.khataBooksRepository
+        .createQueryBuilder('b')
+        .innerJoinAndSelect('b.shopCustomer', 'sc')
+        .where('b.shopId = :shopId', { shopId })
+        .andWhere('b.isDeleted = false')
+        .andWhere('sc.isDeleted = false');
+
+      if (safeForLike) {
         const like = `%${safeForLike}%`;
         const digitsOnly = raw.replace(/\D/g, '');
-        const qb = this.shopCustomersRepository
-          .createQueryBuilder('c')
-          .where('c.shopId = :shopId', { shopId })
-          .andWhere('c.isDeleted = false')
-          .andWhere(
-            new Brackets((wb) => {
-              wb.where('c.displayName ILIKE :like', { like }).orWhere(
-                'c.phone ILIKE :like',
-                { like },
+        qb.andWhere(
+          new Brackets((wb) => {
+            wb.where('sc.displayName ILIKE :like', { like }).orWhere(
+              'sc.phone ILIKE :like',
+              { like },
+            );
+            if (digitsOnly.length >= 2) {
+              wb.orWhere(
+                "regexp_replace(COALESCE(sc.phone, ''), '[^0-9]', '', 'g') LIKE :digitsLike",
+                { digitsLike: `%${digitsOnly}%` },
               );
-              if (digitsOnly.length >= 2) {
-                wb.orWhere(
-                  "regexp_replace(COALESCE(c.phone, ''), '[^0-9]', '', 'g') LIKE :digitsLike",
-                  { digitsLike: `%${digitsOnly}%` },
-                );
-              }
-            }),
-          )
-          .orderBy('c.displayName', 'ASC')
-          .addOrderBy('c.createdAt', 'DESC');
-        customers = await qb.getMany();
+            }
+          }),
+        );
       }
 
-      const ids = customers.map((c) => c.id);
-      const balances = await this.balancesByShopCustomerIds(ids);
-      return customers.map((c) => this.toCustomerDto(c, balances.get(c.id) ?? 0));
+      qb.orderBy('sc.displayName', 'ASC').addOrderBy('sc.createdAt', 'DESC');
+
+      const books = await qb.getMany();
+      return books.map((b) => this.bookToCustomerDto(b));
     } catch (err) {
       if (err instanceof HttpException) {
         throw err;
@@ -102,9 +103,8 @@ export class KhataService {
   ): Promise<ShopCustomerResponseDto> {
     await this.shopsService.findOneOwnedByUser(shopId, ownerUserId);
     await this.ensureKhataBooksForShop(shopId);
-    const customer = await this.requireCustomerInShop(shopId, customerId);
-    const balance = await this.balanceForShopCustomer(customerId);
-    return this.toCustomerDto(customer, balance);
+    const book = await this.requireKhataBookWithCustomer(shopId, customerId);
+    return this.bookToCustomerDto(book);
   }
 
   async createShopCustomer(
@@ -146,7 +146,9 @@ export class KhataService {
       balanceMinor: 0,
     });
     await this.khataBooksRepository.save(book);
-    return this.toCustomerDto(row, 0);
+    // Re-load with the relation so bookToCustomerDto can read sc fields.
+    const saved = await this.requireKhataBookWithCustomer(shopId, row.id);
+    return this.bookToCustomerDto(saved);
   }
 
   async updateShopCustomer(
@@ -174,8 +176,8 @@ export class KhataService {
       .set({ userId: customer.userId })
       .where('"shopCustomerId" = :id', { id: customerId })
       .execute();
-    const balance = await this.balanceForShopCustomer(customerId);
-    return this.toCustomerDto(customer, balance);
+    const book = await this.requireKhataBookWithCustomer(shopId, customerId);
+    return this.bookToCustomerDto(book);
   }
 
   async softDeleteShopCustomer(
@@ -290,6 +292,8 @@ export class KhataService {
     });
   }
 
+  // ── Private helpers ─────────────────────────────────────────────────────────
+
   private async requireCustomerInShop(
     shopId: string,
     customerId: string,
@@ -303,6 +307,7 @@ export class KhataService {
     return customer;
   }
 
+  /** Finds the KhataBook (without loading relations) — used for write paths. */
   private async requireKhataBook(
     shopId: string,
     shopCustomerId: string,
@@ -320,8 +325,26 @@ export class KhataService {
     return book;
   }
 
+  /** Finds the KhataBook with shopCustomer loaded — used for read/response paths. */
+  private async requireKhataBookWithCustomer(
+    shopId: string,
+    shopCustomerId: string,
+  ): Promise<KhataBook> {
+    const book = await this.khataBooksRepository
+      .createQueryBuilder('b')
+      .innerJoinAndSelect('b.shopCustomer', 'sc')
+      .where('b.shopId = :sid', { sid: shopId })
+      .andWhere('sc.id = :cid', { cid: shopCustomerId })
+      .andWhere('b.isDeleted = false')
+      .getOne();
+    if (!book) {
+      throw new NotFoundException('Khata book not found');
+    }
+    return book;
+  }
+
   /**
-   * Creates missing khata_books rows for active shop_customers (e.g. after a partial migration).
+   * Creates missing khata_books rows for active shop_customers (idempotent safety net).
    */
   private async ensureKhataBooksForShop(shopId: string): Promise<void> {
     try {
@@ -347,52 +370,18 @@ export class KhataService {
     }
   }
 
-  private async balanceForShopCustomer(shopCustomerId: string): Promise<number> {
-    const row = await this.khataBooksRepository
-      .createQueryBuilder('b')
-      .select('b.balanceMinor', 'balanceMinor')
-      .innerJoin('b.shopCustomer', 'sc')
-      .where('sc.id = :cid', { cid: shopCustomerId })
-      .andWhere('b.isDeleted = false')
-      .getRawOne<{ balanceMinor: string }>();
-    return Number(row?.balanceMinor ?? 0);
-  }
-
-  private async balancesByShopCustomerIds(
-    customerIds: string[],
-  ): Promise<Map<string, number>> {
-    const map = new Map<string, number>(customerIds.map((id) => [id, 0]));
-    if (customerIds.length === 0) {
-      return map;
-    }
-    const rows = await this.khataBooksRepository
-      .createQueryBuilder('b')
-      .innerJoin('b.shopCustomer', 'sc')
-      .select('sc.id', 'shopCustomerId')
-      .addSelect('b.balanceMinor', 'balanceMinor')
-      .where('sc.id IN (:...ids)', { ids: customerIds })
-      .andWhere('b.isDeleted = false')
-      .getRawMany<{ shopCustomerId: string; balanceMinor: string }>();
-    for (const row of rows) {
-      map.set(row.shopCustomerId, Number(row.balanceMinor));
-    }
-    return map;
-  }
-
-  private toCustomerDto(
-    c: ShopCustomer,
-    outstandingBalanceMinor: number,
-  ): ShopCustomerResponseDto {
+  private bookToCustomerDto(b: KhataBook): ShopCustomerResponseDto {
+    const sc = b.shopCustomer;
     return {
-      id: c.id,
-      shopId: c.shopId,
-      userId: c.userId,
-      displayName: c.displayName,
-      phone: c.phone,
-      notes: c.notes,
-      outstandingBalanceMinor,
-      hasOutstanding: outstandingBalanceMinor > 0,
-      createdAt: c.createdAt,
+      id: sc.id,
+      shopId: b.shopId,
+      userId: b.userId,
+      displayName: sc.displayName,
+      phone: sc.phone,
+      notes: sc.notes,
+      outstandingBalanceMinor: b.balanceMinor,
+      hasOutstanding: b.balanceMinor > 0,
+      createdAt: sc.createdAt,
     };
   }
 
