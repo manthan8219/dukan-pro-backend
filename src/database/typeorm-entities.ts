@@ -21,6 +21,7 @@ import { UserRole } from '../user-roles/entities/user-role.entity';
 import { UserDeliveryAddress } from '../user-delivery-addresses/entities/user-delivery-address.entity';
 import { OrderItem } from '../orders/entities/order-item.entity';
 import { Order } from '../orders/entities/order.entity';
+import { RazorpayCheckoutOrder } from '../payments/entities/razorpay-checkout-order.entity';
 import { ShopSubscription } from '../subscriptions/entities/shop-subscription.entity';
 import { SubscriptionPlan } from '../subscriptions/entities/subscription-plan.entity';
 
@@ -51,4 +52,5 @@ export const typeOrmEntities = [
   ShopCustomer,
   KhataBook,
   KhataEntry,
+  RazorpayCheckoutOrder,
 ];
