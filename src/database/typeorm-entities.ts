@@ -22,6 +22,7 @@ import { UserDeliveryAddress } from '../user-delivery-addresses/entities/user-de
 import { OrderItem } from '../orders/entities/order-item.entity';
 import { Order } from '../orders/entities/order.entity';
 import { RazorpayCheckoutOrder } from '../payments/entities/razorpay-checkout-order.entity';
+import { ShopBillingDocument } from '../shop-billing-documents/entities/shop-billing-document.entity';
 import { ShopSubscription } from '../subscriptions/entities/shop-subscription.entity';
 import { SubscriptionPlan } from '../subscriptions/entities/subscription-plan.entity';
 
@@ -53,4 +54,5 @@ export const typeOrmEntities = [
   KhataBook,
   KhataEntry,
   RazorpayCheckoutOrder,
+  ShopBillingDocument,
 ];
