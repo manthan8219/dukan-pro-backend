@@ -111,6 +111,13 @@ export class StorageService {
   ): string {
     const base = this.config.get<string>('SUPABASE_PUBLIC_URL')!.replace(/\/$/, '');
     if (visibility === PresignUploadVisibility.PUBLIC) {
+      const publicBase = this.config
+        .get<string>('SUPABASE_STORAGE_PUBLIC_BASE_URL')
+        ?.trim()
+        .replace(/\/$/, '');
+      if (publicBase) {
+        return `${publicBase}/${encodeKeySegments(objectKey)}`;
+      }
       return `${base}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encodeKeySegments(objectKey)}`;
     }
     return buildPrivateLocatorUrl(base, bucket, objectKey);

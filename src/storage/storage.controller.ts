@@ -1,10 +1,13 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
 import { PresignUploadDto } from './dto/presign-upload.dto';
 import { StorageService, type PresignPutResult } from './storage.service';
 
@@ -26,9 +29,12 @@ export class StorageController {
   }
 
   @Post('presign-upload')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth()
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing Firebase ID token' })
   @ApiOperation({
     summary:
-      'Presign a PUT to Supabase Storage (S3). Use returned URL from the browser, then register content with storageUrl.',
+      'Presign a PUT to Supabase Storage (S3). Use returned URL from the app, PUT bytes, then POST /content with storageUrl.',
   })
   @ApiCreatedResponse({
     description: 'PUT target and the storageUrl to save on the content row',

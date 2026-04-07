@@ -1,17 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 import {
   IsEnum,
   IsObject,
   IsOptional,
   IsString,
-  IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
 import { ContentKind } from '../content-kind.enum';
 
-export class CreateContentDto {
+/** Body for POST /content after uploading bytes to the presigned URL. Owner is taken from the Firebase session. */
+export class RegisterUploadedContentDto {
   @ApiProperty()
   @IsString()
   @MinLength(1)
@@ -41,11 +40,6 @@ export class CreateContentDto {
   @IsString()
   @MaxLength(32)
   byteSize?: string | null;
-
-  @ApiPropertyOptional({ format: 'uuid' })
-  @IsOptional()
-  @IsUUID()
-  ownerUserId?: string | null;
 
   @ApiPropertyOptional()
   @IsOptional()

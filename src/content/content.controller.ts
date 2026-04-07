@@ -7,16 +7,22 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
+import { User } from '../users/entities/user.entity';
 import { ContentService } from './content.service';
-import { CreateContentDto } from './dto/create-content.dto';
+import { RegisterUploadedContentDto } from './dto/register-uploaded-content.dto';
 import { Content } from './entities/content.entity';
 
 @ApiTags('content')
@@ -25,12 +31,19 @@ export class ContentController {
   constructor(private readonly contentService: ContentService) {}
 
   @Post()
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Register file metadata after upload (URL/key to stored object)',
+    summary:
+      'Register file metadata after direct upload (presign via POST /storage/presign-upload, then PUT bytes)',
   })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing Firebase ID token' })
   @ApiCreatedResponse({ type: Content })
-  create(@Body() dto: CreateContentDto): Promise<Content> {
-    return this.contentService.create(dto);
+  create(
+    @CurrentUser() user: User,
+    @Body() dto: RegisterUploadedContentDto,
+  ): Promise<Content> {
+    return this.contentService.registerAfterUpload(user.id, dto);
   }
 
   @Get(':id')
