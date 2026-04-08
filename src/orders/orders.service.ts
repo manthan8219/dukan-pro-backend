@@ -13,6 +13,7 @@ import { UserDeliveryAddress } from '../user-delivery-addresses/entities/user-de
 import { UsersService } from '../users/users.service';
 import { CustomerDemandsService } from '../customer-demands/customer-demands.service';
 import { DemandInvitationsService } from '../customer-demands/demand-invitations.service';
+import { ShopOrdersGateway } from '../shop-orders/shop-orders.gateway';
 import { PlaceOrdersCheckoutDto } from './dto/place-orders-checkout.dto';
 import { OrderItemResponseDto } from './dto/order-item-response.dto';
 import { OrderResponseDto } from './dto/order-response.dto';
@@ -102,6 +103,7 @@ export class OrdersService {
     private readonly notificationsService: NotificationsService,
     private readonly demandInvitationsService: DemandInvitationsService,
     private readonly customerDemandsService: CustomerDemandsService,
+    private readonly shopOrdersGateway: ShopOrdersGateway,
   ) {}
 
   private toItemDto(row: OrderItem): OrderItemResponseDto {
@@ -332,6 +334,13 @@ export class OrdersService {
         body: `Your order from ${shop.displayName} was placed.`,
         actorUserId: userId,
       });
+      this.shopOrdersGateway.emitOrderChange({
+        type: 'created',
+        orderId: order.id,
+        shopId: order.shopId,
+        buyerUserId: order.userId,
+        status: order.status,
+      });
     }
 
     const withItems = await this.orderRepo.find({
@@ -422,6 +431,14 @@ export class OrdersService {
       title: 'Order update',
       body: `Status is now ${status.replaceAll('_', ' ')}.`,
       actorUserId: ownerUserId,
+    });
+
+    this.shopOrdersGateway.emitOrderChange({
+      type: 'updated',
+      orderId: row.id,
+      shopId: row.shopId,
+      buyerUserId: row.userId,
+      status: row.status,
     });
 
     return this.toOrderDto(row, row.items ?? [], row.shop?.displayName);

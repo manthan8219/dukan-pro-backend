@@ -5,6 +5,7 @@ import { DemandShopInvitation } from '../customer-demands/entities/demand-shop-i
 import { KhataBook } from '../khata/entities/khata-book.entity';
 import { KhataEntry } from '../khata/entities/khata-entry.entity';
 import { ShopCustomer } from '../khata/entities/shop-customer.entity';
+import { UserFcmToken } from '../notifications/entities/user-fcm-token.entity';
 import { UserNotification } from '../notifications/entities/user-notification.entity';
 import { Product } from '../products/entities/product.entity';
 import { SellerProfile } from '../seller-profile/entities/seller-profile.entity';
@@ -43,6 +44,7 @@ export const typeOrmEntities = [
   ShopRating,
   ShopDeliveryRadiusRule,
   UserNotification,
+  UserFcmToken,
   CustomerDemand,
   DemandShopInvitation,
   CustomerDemandAudit,

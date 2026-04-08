@@ -15,6 +15,7 @@ import {
   InvitationKind,
   SELLER_HUB_NOTIFICATION_TYPES,
 } from './notification-hub.constants';
+import { FcmPushService } from './fcm-push.service';
 
 const MONTHLY_INSIGHTS_CHECK_MS = 60 * 60 * 1000;
 
@@ -25,6 +26,7 @@ export class NotificationsService implements OnModuleInit {
     private readonly notifRepo: Repository<UserNotification>,
     private readonly usersService: UsersService,
     private readonly shopsService: ShopsService,
+    private readonly fcmPush: FcmPushService,
   ) {}
 
   onModuleInit(): void {
@@ -340,6 +342,19 @@ export class NotificationsService implements OnModuleInit {
         isDeleted: false,
       }),
     );
+
+    const title = args.title?.trim() || 'New order received';
+    const body =
+      args.body?.trim() || 'Open the seller app to view this order.';
+    void this.fcmPush.sendToUser(
+      args.shopOwnerUserId,
+      { title, body },
+      {
+        kind: 'SELLER_NEW_ORDER',
+        orderId: args.orderId,
+        shopId: args.shopId,
+      },
+    );
   }
 
   /**
@@ -378,6 +393,18 @@ export class NotificationsService implements OnModuleInit {
         updatedBy: args.actorUserId,
         isDeleted: false,
       }),
+    );
+
+    const body =
+      args.body?.trim() || 'Open the app to see your order details.';
+    void this.fcmPush.sendToUser(
+      args.customerUserId,
+      { title: args.title.trim(), body },
+      {
+        kind: 'CUSTOMER_ORDER_UPDATE',
+        orderId: args.orderId,
+        step: args.step,
+      },
     );
   }
 
