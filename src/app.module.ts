@@ -26,6 +26,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { KhataModule } from './khata/khata.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ShopBillingDocumentsModule } from './shop-billing-documents/shop-billing-documents.module';
+import { ShopSuppliersModule } from './shop-suppliers/shop-suppliers.module';
 import { typeOrmEntities } from './database/typeorm-entities';
 
 const skipDb = process.env.SKIP_DB === 'true';
@@ -103,6 +104,7 @@ const skipDb = process.env.SKIP_DB === 'true';
           KhataModule,
           PaymentsModule,
           ShopBillingDocumentsModule,
+          ShopSuppliersModule,
         ]),
   ],
   controllers: [AppController],
