@@ -27,6 +27,7 @@ import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
 import { User } from '../users/entities/user.entity';
 import { CreateShopBillingDocumentDto } from './dto/create-shop-billing-document.dto';
 import { ListShopBillingDocumentsQueryDto } from './dto/list-shop-billing-documents-query.dto';
+import { SendBillingDocumentEmailDto } from './dto/send-billing-document-email.dto';
 import { ShopBillingDocumentResponseDto } from './dto/shop-billing-document-response.dto';
 import { UpdateShopBillingDocumentDto } from './dto/update-shop-billing-document.dto';
 import { ShopBillingDocumentsService } from './shop-billing-documents.service';
@@ -103,5 +104,28 @@ export class ShopBillingDocumentsController {
     @CurrentUser() user: User,
   ): Promise<void> {
     await this.service.removeForShop(shopId, user.id, documentId);
+  }
+
+  @Post(':documentId/send-email')
+  @ApiOperation({
+    summary: 'Send billing document (invoice/quotation) PDF to customer via email',
+  })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        sent: { type: 'boolean' },
+        recipientEmail: { type: 'string' },
+      },
+    },
+  })
+  @ApiNotFoundResponse({ description: 'Billing document not found' })
+  sendEmail(
+    @Param('shopId', ParseUUIDPipe) shopId: string,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+    @CurrentUser() user: User,
+    @Body() dto: SendBillingDocumentEmailDto,
+  ): Promise<{ sent: boolean; recipientEmail: string }> {
+    return this.service.sendEmail(shopId, user.id, documentId, dto);
   }
 }

@@ -15,6 +15,12 @@ export class UpdateShopCustomerDto {
   @MaxLength(32)
   phone?: string | null;
 
+  @ApiPropertyOptional({ example: 'customer@example.com' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(320)
+  email?: string | null;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

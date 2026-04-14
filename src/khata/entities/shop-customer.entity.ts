@@ -43,6 +43,10 @@ export class ShopCustomer extends BaseEntity {
   @Column({ type: 'varchar', length: 32, nullable: true })
   phone: string | null;
 
+  @ApiPropertyOptional({ example: 'customer@example.com' })
+  @Column({ type: 'varchar', length: 320, nullable: true })
+  email: string | null;
+
   @ApiPropertyOptional()
   @Column({ type: 'text', nullable: true })
   notes: string | null;

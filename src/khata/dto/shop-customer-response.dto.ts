@@ -17,6 +17,9 @@ export class ShopCustomerResponseDto {
   phone: string | null;
 
   @ApiPropertyOptional({ nullable: true })
+  email: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
   notes: string | null;
 
   @ApiProperty({

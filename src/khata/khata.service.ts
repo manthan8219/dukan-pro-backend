@@ -131,6 +131,7 @@ export class KhataService {
       userId,
       displayName,
       phone: dto.phone?.trim() || null,
+      email: dto.email?.trim().toLowerCase() || null,
       notes: dto.notes ?? null,
     });
     try {
@@ -165,6 +166,9 @@ export class KhataService {
     }
     if (dto.phone !== undefined) {
       customer.phone = dto.phone?.trim() || null;
+    }
+    if (dto.email !== undefined) {
+      customer.email = dto.email?.trim().toLowerCase() || null;
     }
     if (dto.notes !== undefined) {
       customer.notes = dto.notes;
@@ -378,6 +382,7 @@ export class KhataService {
       userId: b.userId,
       displayName: sc.displayName,
       phone: sc.phone,
+      email: sc.email,
       notes: sc.notes,
       outstandingBalanceMinor: b.balanceMinor,
       hasOutstanding: b.balanceMinor > 0,
