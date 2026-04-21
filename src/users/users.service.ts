@@ -44,6 +44,67 @@ export class UsersService {
     return this.usersRepository.findOne({ where: { email } });
   }
 
+  async findByPhone(phoneNumber: string): Promise<User | null> {
+    return this.usersRepository.findOne({ where: { phoneNumber } });
+  }
+
+  /**
+   * Find or create a stub user for a khata customer who is not yet a platform user.
+   * Uses phone as primary lookup key; falls back to email if provided.
+   */
+  async findOrCreateStub(params: {
+    displayName: string;
+    phone?: string | null;
+    email?: string | null;
+  }): Promise<User> {
+    const phone = params.phone?.trim() || null;
+    const email = params.email?.trim().toLowerCase() || null;
+
+    // Try phone lookup first
+    if (phone) {
+      const byPhone = await this.findByPhone(phone);
+      if (byPhone) return byPhone;
+    }
+
+    // Try email lookup
+    if (email) {
+      const byEmail = await this.findByEmail(email);
+      if (byEmail) return byEmail;
+    }
+
+    // Create stub — synthetic email to satisfy unique constraint
+    const { firstName, lastName } = splitDisplayName(params.displayName);
+    const syntheticEmail =
+      email ??
+      `stub.${phone ? phone.replace(/\D/g, '') : Date.now()}@khata.dukaanpro.internal`;
+
+    const user = this.usersRepository.create({
+      firstName,
+      lastName,
+      email: syntheticEmail,
+      phoneNumber: phone ?? '-',
+      isVerified: false,
+      firebaseUid: null,
+      lastLoginAt: new Date(),
+    });
+    try {
+      return await this.usersRepository.save(user);
+    } catch (err: unknown) {
+      if (this.isUniqueViolation(err)) {
+        // Race — another request created with same email/phone
+        if (phone) {
+          const byPhone = await this.findByPhone(phone);
+          if (byPhone) return byPhone;
+        }
+        if (email) {
+          const byEmail = await this.findByEmail(email);
+          if (byEmail) return byEmail;
+        }
+      }
+      throw err;
+    }
+  }
+
   /**
    * Creates or updates the Postgres user for a Firebase sign-in.
    * Resolves by Firebase UID first, then by email (legacy rows without UID or after UID changes).

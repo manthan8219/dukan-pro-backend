@@ -115,12 +115,28 @@ export class KhataService {
     await this.shopsService.findOneOwnedByUser(shopId, ownerUserId);
     let displayName = dto.displayName?.trim();
     let userId: string | null = dto.userId ?? null;
+
     if (userId) {
+      // Explicit userId provided — validate it exists
       const u = await this.usersService.findOne(userId);
       if (!displayName) {
         displayName = `${u.firstName} ${u.lastName}`.trim();
       }
+    } else {
+      // No userId — find or create a stub user so userId is never null
+      if (!displayName) {
+        throw new ConflictException(
+          'displayName is required when userId is not linked',
+        );
+      }
+      const stubUser = await this.usersService.findOrCreateStub({
+        displayName,
+        phone: dto.phone,
+        email: dto.email,
+      });
+      userId = stubUser.id;
     }
+
     if (!displayName) {
       throw new ConflictException(
         'displayName is required when userId is not linked',
