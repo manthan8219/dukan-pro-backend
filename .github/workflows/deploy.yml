@@ -1,0 +1,26 @@
+name: Deploy to Oracle VM
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: opc
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            cd ~/dukan-pro-backend
+            git pull origin main
+            corepack enable
+            yarn install --immutable
+            yarn build
+            pm2 restart dukan-pro-backend || pm2 start dist/main.js --name dukan-pro-backend
+            pm2 save
