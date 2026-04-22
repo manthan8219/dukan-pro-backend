@@ -12,6 +12,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product } from './entities/product.entity';
 import {
+  BarcodeExternalSource,
   OpenFoodFactsMapped,
   OpenFoodFactsService,
 } from './open-food-facts.service';
@@ -121,18 +122,18 @@ export class ProductsService {
       return { source: 'local', barcode: code, product: local };
     }
 
-    const off = await this.openFoodFacts.fetchProduct(code);
-    if (!off) {
+    const hit = await this.openFoodFacts.fetchProduct(code);
+    if (!hit) {
       return { source: 'unknown', barcode: code, product: null };
     }
 
     try {
-      const product = await this.createOrMergeFromOpenFoodFacts(code, off);
-      return { source: 'openfoodfacts', barcode: code, product };
+      const product = await this.createOrMergeFromOpenFoodFacts(code, hit.data);
+      return { source: hit.source, barcode: code, product };
     } catch (e) {
       const again = await this.findByBarcode(code);
       if (again) {
-        return { source: 'openfoodfacts', barcode: code, product: again };
+        return { source: hit.source, barcode: code, product: again };
       }
       throw e;
     }

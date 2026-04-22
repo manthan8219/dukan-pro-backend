@@ -1,10 +1,21 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { BarcodeExternalSource } from '../open-food-facts.service';
 import { Product } from '../entities/product.entity';
 
-export type BarcodeResolveSource = 'local' | 'openfoodfacts' | 'unknown';
+export type BarcodeResolveSource = 'local' | BarcodeExternalSource | 'unknown';
+
+const ALL_SOURCES: BarcodeResolveSource[] = [
+  'local',
+  'openfoodfacts',
+  'openbeautyfacts',
+  'openproductsfacts',
+  'openpetfoodfacts',
+  'upcitemdb',
+  'unknown',
+];
 
 export class BarcodeResolveResponseDto {
-  @ApiProperty({ enum: ['local', 'openfoodfacts', 'unknown'] })
+  @ApiProperty({ enum: ALL_SOURCES })
   source!: BarcodeResolveSource;
 
   @ApiProperty({ description: 'Normalized barcode used for lookup' })
@@ -13,7 +24,7 @@ export class BarcodeResolveResponseDto {
   @ApiPropertyOptional({
     type: () => Product,
     nullable: true,
-    description: 'Catalog row when found locally or created from Open Food Facts',
+    description: 'Catalog row when found locally or created from an external barcode source',
   })
   product!: Product | null;
 }

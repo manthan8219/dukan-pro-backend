@@ -7,57 +7,133 @@ export type OpenFoodFactsMapped = {
   imageUrl: string | null;
 };
 
+export type BarcodeExternalSource =
+  | 'openfoodfacts'
+  | 'openbeautyfacts'
+  | 'openproductsfacts'
+  | 'openpetfoodfacts'
+  | 'upcitemdb';
+
 type OffProductJson = Record<string, unknown>;
+
+const OFF_FAMILY_SOURCES: { id: BarcodeExternalSource; baseUrl: string }[] = [
+  {
+    id: 'openfoodfacts',
+    baseUrl: 'https://world.openfoodfacts.org/api/v2/product',
+  },
+  {
+    id: 'openbeautyfacts',
+    baseUrl: 'https://world.openbeautyfacts.org/api/v2/product',
+  },
+  {
+    id: 'openproductsfacts',
+    baseUrl: 'https://world.openproductsfacts.org/api/v2/product',
+  },
+  {
+    id: 'openpetfoodfacts',
+    baseUrl: 'https://world.openpetfoodfacts.org/api/v2/product',
+  },
+];
 
 @Injectable()
 export class OpenFoodFactsService {
   private readonly logger = new Logger(OpenFoodFactsService.name);
-  private readonly baseUrl =
-    'https://world.openfoodfacts.org/api/v2/product';
+  private readonly userAgent =
+    process.env.OPENFOODFACTS_USER_AGENT ??
+    'DukaanPro/1.0 (https://github.com/manthan8219/dukan-pro)';
 
   /**
-   * Returns mapped product data, or null if not found / unusable.
+   * Tries OFF family sources + UPCitemdb in sequence, returns first hit.
    */
-  async fetchProduct(code: string): Promise<OpenFoodFactsMapped | null> {
-    const url = `${this.baseUrl}/${encodeURIComponent(code)}`;
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), 12_000);
-    const userAgent =
-      process.env.OPENFOODFACTS_USER_AGENT ??
-      'DukaanPro/1.0 (https://github.com/manthan8219/dukan-pro)';
+  async fetchProduct(
+    code: string,
+  ): Promise<{ data: OpenFoodFactsMapped; source: BarcodeExternalSource } | null> {
+    // 1. Try OFF-family databases (food, beauty, products, pet food)
+    for (const src of OFF_FAMILY_SOURCES) {
+      const result = await this.fetchFromOffFamily(code, src.baseUrl);
+      if (result) {
+        this.logger.debug(`Hit on ${src.id} for ${code}`);
+        return { data: result, source: src.id };
+      }
+    }
 
+    // 2. Fallback: UPCitemdb free trial (100 req/day, no key needed)
+    const upc = await this.fetchFromUpcItemDb(code);
+    if (upc) {
+      this.logger.debug(`Hit on upcitemdb for ${code}`);
+      return { data: upc, source: 'upcitemdb' };
+    }
+
+    return null;
+  }
+
+  private async fetchFromOffFamily(
+    code: string,
+    baseUrl: string,
+  ): Promise<OpenFoodFactsMapped | null> {
+    const url = `${baseUrl}/${encodeURIComponent(code)}`;
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 8_000);
     try {
       const res = await fetch(url, {
         signal: ac.signal,
-        headers: {
-          Accept: 'application/json',
-          'User-Agent': userAgent,
-        },
+        headers: { Accept: 'application/json', 'User-Agent': this.userAgent },
       });
-      if (!res.ok) {
-        this.logger.debug(`OFF HTTP ${res.status} for ${code}`);
-        return null;
-      }
+      if (!res.ok) return null;
       const json = (await res.json()) as {
         product?: OffProductJson;
         status?: number;
       };
       const p = json.product;
-      if (!p || typeof p !== 'object') {
-        return null;
-      }
+      if (!p || typeof p !== 'object') return null;
       const name = this.pickName(p);
-      if (!name) {
-        return null;
-      }
+      if (!name) return null;
       return {
         name: name.slice(0, 200),
         description: this.pickDescription(p),
         category: this.pickCategory(p),
         imageUrl: this.pickImageUrl(p),
       };
-    } catch (e) {
-      this.logger.warn(`Open Food Facts request failed for ${code}: ${String(e)}`);
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  private async fetchFromUpcItemDb(
+    code: string,
+  ): Promise<OpenFoodFactsMapped | null> {
+    const url = `https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(code)}`;
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 8_000);
+    try {
+      const res = await fetch(url, {
+        signal: ac.signal,
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) return null;
+      const json = (await res.json()) as {
+        code?: string;
+        total?: number;
+        items?: Array<{
+          title?: string;
+          description?: string;
+          category?: string;
+          images?: string[];
+        }>;
+      };
+      const item = json.items?.[0];
+      if (!item) return null;
+      const name = item.title?.trim();
+      if (!name) return null;
+      return {
+        name: name.slice(0, 200),
+        description: item.description?.trim() ?? null,
+        category: item.category?.trim() ?? null,
+        imageUrl: item.images?.[0] ?? null,
+      };
+    } catch {
       return null;
     } finally {
       clearTimeout(timer);
@@ -89,11 +165,12 @@ export class OpenFoodFactsService {
       const t = ing.trim();
       return t.length > 5000 ? t.slice(0, 5000) : t;
     }
-    const gen = typeof p.generic_name_en === 'string' && p.generic_name_en.trim()
-      ? p.generic_name_en.trim()
-      : typeof p.generic_name === 'string' && p.generic_name.trim()
-        ? p.generic_name.trim()
-        : null;
+    const gen =
+      typeof p.generic_name_en === 'string' && p.generic_name_en.trim()
+        ? p.generic_name_en.trim()
+        : typeof p.generic_name === 'string' && p.generic_name.trim()
+          ? p.generic_name.trim()
+          : null;
     return gen;
   }
 
@@ -101,9 +178,7 @@ export class OpenFoodFactsService {
     const cat = typeof p.categories === 'string' ? p.categories.trim() : '';
     if (cat) {
       const first = cat.split(',')[0]?.trim();
-      if (first) {
-        return first.slice(0, 100);
-      }
+      if (first) return first.slice(0, 100);
     }
     const tags = p.categories_tags;
     if (Array.isArray(tags) && tags.length > 0) {
