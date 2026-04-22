@@ -427,6 +427,66 @@ export class KhataService {
     };
   }
 
+  /**
+   * Idempotent — called after a buyer places an order so they appear in the
+   * seller's customer list automatically. No-ops if the customer row already exists.
+   */
+  async ensureShopCustomerForBuyer(
+    shopId: string,
+    buyerUserId: string,
+  ): Promise<void> {
+    // Already exists (active or soft-deleted)
+    const existing = await this.shopCustomersRepository.findOne({
+      where: { shopId, userId: buyerUserId },
+    });
+    if (existing) {
+      // If soft-deleted, revive them
+      if (existing.isDeleted) {
+        await this.shopCustomersRepository.update(
+          { id: existing.id },
+          { isDeleted: false },
+        );
+        await this.khataBooksRepository
+          .createQueryBuilder()
+          .update(KhataBook)
+          .set({ isDeleted: false })
+          .where('"shopCustomerId" = :id', { id: existing.id })
+          .execute();
+      }
+      return;
+    }
+
+    const buyer = await this.usersService.findOne(buyerUserId);
+    const displayName =
+      `${buyer.firstName} ${buyer.lastName}`.trim() || 'Customer';
+
+    const row = this.shopCustomersRepository.create({
+      shopId,
+      userId: buyerUserId,
+      displayName,
+      phone: buyer.phoneNumber !== '-' ? buyer.phoneNumber : null,
+      email: buyer.email.endsWith('@firebase.dukaanpro.internal')
+        ? null
+        : buyer.email,
+      notes: null,
+    });
+    try {
+      await this.shopCustomersRepository.save(row);
+    } catch (e) {
+      // Unique violation — concurrent request already created the row
+      this.rethrowUniqueShopUser(e);
+      return;
+    }
+
+    const book = this.khataBooksRepository.create({
+      shopId,
+      shopCustomer: { id: row.id } as ShopCustomer,
+      userId: buyerUserId,
+      balanceMinor: 0,
+    });
+    await this.khataBooksRepository.save(book);
+  }
+
   private rethrowUniqueShopUser(err: unknown): void {
     if (!(err instanceof QueryFailedError)) {
       return;

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { CustomerDemandsModule } from '../customer-demands/customer-demands.module';
+import { KhataModule } from '../khata/khata.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ShopOrdersModule } from '../shop-orders/shop-orders.module';
 import { ShopProduct } from '../shop-products/entities/shop-product.entity';
@@ -28,6 +29,7 @@ import { ShopOwnerOrdersController } from './shop-owner-orders.controller';
     ShopsModule,
     NotificationsModule,
     CustomerDemandsModule,
+    KhataModule,
     ShopOrdersModule,
     AuthModule,
   ],

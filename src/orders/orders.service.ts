@@ -7,6 +7,7 @@ import {
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { ExpoPushService } from '../notifications/expo-push.service';
+import { KhataService } from '../khata/khata.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ShopProduct } from '../shop-products/entities/shop-product.entity';
 import { ShopsService } from '../shops/shops.service';
@@ -103,6 +104,7 @@ export class OrdersService {
     private readonly shopsService: ShopsService,
     private readonly notificationsService: NotificationsService,
     private readonly expoPushService: ExpoPushService,
+    private readonly khataService: KhataService,
     private readonly demandInvitationsService: DemandInvitationsService,
     private readonly customerDemandsService: CustomerDemandsService,
     private readonly shopOrdersGateway: ShopOrdersGateway,
@@ -320,6 +322,14 @@ export class OrdersService {
     });
 
     for (const order of createdOrders) {
+      // Auto-register buyer as a shop customer (fire-and-forget, never breaks checkout)
+      void this.khataService
+        .ensureShopCustomerForBuyer(order.shopId, userId)
+        .catch((e: unknown) => {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.warn(`ensureShopCustomerForBuyer failed: ${msg}`);
+        });
+
       const shop = await this.shopsService.findOne(order.shopId);
       await this.notificationsService.recordSellerNewOrderAlert({
         shopOwnerUserId: shop.userId,
