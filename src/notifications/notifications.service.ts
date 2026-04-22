@@ -313,8 +313,8 @@ export class NotificationsService implements OnModuleInit {
     shopOwnerUserId: string;
     shopId: string;
     orderId: string;
-    title?: string;
-    body?: string;
+    totalMinor: number;
+    itemCount: number;
     actorUserId: string | null;
   }): Promise<void> {
     const dedupeKey = `seller-order:${args.orderId}`;
@@ -324,12 +324,19 @@ export class NotificationsService implements OnModuleInit {
     if (dup) {
       return;
     }
+
+    const orderNumber = 'ORD-' + args.orderId.replace(/-/g, '').slice(0, 8).toUpperCase();
+    const total = (args.totalMinor / 100).toFixed(2).replace(/\.00$/, '');
+    const itemLabel = args.itemCount === 1 ? '1 item' : `${args.itemCount} items`;
+    const title = '🛒 New Order Received!';
+    const body = `${orderNumber} · ₹${total} · ${itemLabel}`;
+
     await this.notifRepo.save(
       this.notifRepo.create({
         userId: args.shopOwnerUserId,
         type: UserNotificationType.SELLER_NEW_ORDER,
-        title: args.title?.trim() || 'New order received',
-        body: args.body?.trim() ?? null,
+        title,
+        body,
         readAt: null,
         invitationId: null,
         dedupeKey,
@@ -343,17 +350,11 @@ export class NotificationsService implements OnModuleInit {
       }),
     );
 
-    const title = args.title?.trim() || 'New order received';
-    const body =
-      args.body?.trim() || 'Open the seller app to view this order.';
     void this.fcmPush.sendToUser(
       args.shopOwnerUserId,
       { title, body },
-      {
-        kind: 'SELLER_NEW_ORDER',
-        orderId: args.orderId,
-        shopId: args.shopId,
-      },
+      { screen: 'orders', orderId: args.orderId },
+      { androidChannelId: 'orders' },
     );
   }
 

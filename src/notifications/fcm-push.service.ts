@@ -75,6 +75,7 @@ export class FcmPushService {
     userId: string,
     notification: { title: string; body: string },
     data: Record<string, string>,
+    opts?: { androidChannelId?: string },
   ): Promise<void> {
     if (!this.ensureFirebaseApp()) {
       return;
@@ -88,7 +89,13 @@ export class FcmPushService {
         tokens,
         notification,
         data,
-        android: { priority: 'high' },
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: opts?.androidChannelId ?? 'default',
+            sound: 'default',
+          },
+        },
         apns: {
           payload: {
             aps: {
@@ -99,9 +106,13 @@ export class FcmPushService {
         },
       });
       if (res.failureCount > 0) {
+        const staleErrorCodes = new Set([
+          'messaging/registration-token-not-registered',
+          'messaging/invalid-registration-token',
+        ]);
         for (let i = 0; i < res.responses.length; i++) {
           const r = res.responses[i]!;
-          if (!r.success && r.error?.code === 'messaging/registration-token-not-registered') {
+          if (!r.success && staleErrorCodes.has(r.error?.code ?? '')) {
             const t = tokens[i];
             if (t) {
               await this.tokenRepo.update(

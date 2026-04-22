@@ -335,7 +335,8 @@ export class OrdersService {
         shopOwnerUserId: shop.userId,
         shopId: order.shopId,
         orderId: order.id,
-        body: `Order total ₹${(order.totalMinor / 100).toFixed(2)}`,
+        totalMinor: order.totalMinor,
+        itemCount: preparedByShop.get(order.shopId)?.length ?? 0,
         actorUserId: userId,
       });
       await this.notificationsService.recordCustomerOrderUpdate({
