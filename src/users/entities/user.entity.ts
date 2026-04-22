@@ -34,4 +34,10 @@ export class User extends BaseEntity {
   // ✅ Track last login (analytics + debugging)
   @Column({ type: 'timestamp', nullable: true })
   lastLoginAt: Date;
+
+  @ApiPropertyOptional({
+    description: 'Expo push token for buyer app push notifications.',
+  })
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  expoPushToken: string | null;
 }

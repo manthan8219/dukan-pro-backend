@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
+import { ExpoPushService } from '../notifications/expo-push.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ShopProduct } from '../shop-products/entities/shop-product.entity';
 import { ShopsService } from '../shops/shops.service';
@@ -101,6 +102,7 @@ export class OrdersService {
     private readonly usersService: UsersService,
     private readonly shopsService: ShopsService,
     private readonly notificationsService: NotificationsService,
+    private readonly expoPushService: ExpoPushService,
     private readonly demandInvitationsService: DemandInvitationsService,
     private readonly customerDemandsService: CustomerDemandsService,
     private readonly shopOrdersGateway: ShopOrdersGateway,
@@ -334,6 +336,16 @@ export class OrdersService {
         body: `Your order from ${shop.displayName} was placed.`,
         actorUserId: userId,
       });
+      // Fire-and-forget Expo push for PLACED
+      void this.usersService.findOne(userId).then((buyer) => {
+        if (buyer.expoPushToken) {
+          void this.expoPushService.sendOrderStatusPush(
+            buyer.expoPushToken,
+            order.id,
+            OrderStatus.PLACED,
+          );
+        }
+      }).catch(() => undefined);
       this.shopOrdersGateway.emitOrderChange({
         type: 'created',
         orderId: order.id,
@@ -432,6 +444,17 @@ export class OrdersService {
       body: `Status is now ${status.replaceAll('_', ' ')}.`,
       actorUserId: ownerUserId,
     });
+
+    // Fire-and-forget Expo push to buyer
+    void this.usersService.findOne(row.userId).then((buyer) => {
+      if (buyer.expoPushToken) {
+        void this.expoPushService.sendOrderStatusPush(
+          buyer.expoPushToken,
+          row.id,
+          status,
+        );
+      }
+    }).catch(() => undefined);
 
     this.shopOrdersGateway.emitOrderChange({
       type: 'updated',

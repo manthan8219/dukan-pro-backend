@@ -44,6 +44,10 @@ export class UsersService {
     return this.usersRepository.findOne({ where: { email } });
   }
 
+  async savePushToken(userId: string, expoPushToken: string): Promise<void> {
+    await this.usersRepository.update({ id: userId }, { expoPushToken });
+  }
+
   async findByPhone(phoneNumber: string): Promise<User | null> {
     return this.usersRepository.findOne({ where: { phoneNumber } });
   }
