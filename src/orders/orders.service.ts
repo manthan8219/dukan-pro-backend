@@ -125,6 +125,7 @@ export class OrdersService {
     row: Order,
     items: OrderItem[],
     shopDisplayName?: string,
+    buyerFields?: { buyerName: string | null; buyerPhone: string | null; deliveryAddress: string | null },
   ): OrderResponseDto {
     return {
       id: row.id,
@@ -141,7 +142,24 @@ export class OrdersService {
       createdAt: row.createdAt.toISOString(),
       items: [...items].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).map((i) => this.toItemDto(i)),
       sourceDemandInvitationId: row.sourceDemandInvitationId ?? null,
+      ...buyerFields,
     };
+  }
+
+  private buyerFieldsFromOrder(row: Order): { buyerName: string | null; buyerPhone: string | null; deliveryAddress: string | null } {
+    const user = row.user as (Order['user'] & { firstName?: string; lastName?: string; phoneNumber?: string }) | null;
+    const addr = row.deliveryAddress ?? null;
+    const buyerName = user
+      ? `${(user as { firstName: string }).firstName} ${(user as { lastName: string }).lastName}`.trim() || null
+      : null;
+    const buyerPhone = user ? ((user as { phoneNumber: string }).phoneNumber !== '-' ? (user as { phoneNumber: string }).phoneNumber : null) : null;
+    const deliveryAddress = addr
+      ? [addr.line1, addr.line2, addr.landmark, addr.city, addr.pin]
+          .map((s) => s?.trim())
+          .filter(Boolean)
+          .join(', ')
+      : null;
+    return { buyerName, buyerPhone, deliveryAddress };
   }
 
   async checkout(
@@ -168,6 +186,7 @@ export class OrdersService {
       dto.paymentMethod ?? null;
 
     const createdOrders: Order[] = [];
+    const preparedByShop = new Map<string, PreparedLine[]>();
 
     await this.dataSource.transaction(async (manager) => {
       let closeDemandId: string | null = null;
@@ -193,7 +212,7 @@ export class OrdersService {
       }
 
       const byId = new Map(listings.map((s) => [s.id, s] as const));
-      const preparedByShop = new Map<string, PreparedLine[]>();
+      preparedByShop.clear();
 
       for (const [shopProductId, quantity] of merged) {
         const sp = byId.get(shopProductId)!;
@@ -414,11 +433,11 @@ export class OrdersService {
     }
     const rows = await this.orderRepo.find({
       where: { shopId, isDeleted: false },
-      relations: { items: true, shop: true },
+      relations: { items: true, shop: true, user: true, deliveryAddress: true },
       order: { createdAt: 'DESC' },
     });
     return rows.map((r) =>
-      this.toOrderDto(r, r.items ?? [], r.shop?.displayName),
+      this.toOrderDto(r, r.items ?? [], r.shop?.displayName, this.buyerFieldsFromOrder(r)),
     );
   }
 
@@ -435,7 +454,7 @@ export class OrdersService {
     }
     const row = await this.orderRepo.findOne({
       where: { id: orderId, shopId, isDeleted: false },
-      relations: { items: true, shop: true },
+      relations: { items: true, shop: true, user: true, deliveryAddress: true },
     });
     if (!row) {
       throw new NotFoundException('Order not found');
@@ -475,6 +494,6 @@ export class OrdersService {
       status: row.status,
     });
 
-    return this.toOrderDto(row, row.items ?? [], row.shop?.displayName);
+    return this.toOrderDto(row, row.items ?? [], row.shop?.displayName, this.buyerFieldsFromOrder(row));
   }
 }

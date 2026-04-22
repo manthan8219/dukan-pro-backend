@@ -50,4 +50,13 @@ export class OrderResponseDto {
     description: 'Present when the order came from a demand quotation checkout.',
   })
   sourceDemandInvitationId?: string | null;
+
+  @ApiPropertyOptional({ description: 'Buyer full name (shop-owner view only).' })
+  buyerName?: string | null;
+
+  @ApiPropertyOptional({ description: 'Buyer phone (shop-owner view only).' })
+  buyerPhone?: string | null;
+
+  @ApiPropertyOptional({ description: 'Formatted delivery address (shop-owner view only).' })
+  deliveryAddress?: string | null;
 }
