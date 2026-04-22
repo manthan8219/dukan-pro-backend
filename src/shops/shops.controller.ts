@@ -19,6 +19,7 @@ import {
 import { CurrentUser } from '../auth/current-user.decorator';
 import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
 import { User } from '../users/entities/user.entity';
+import { ListShopsQueryDto } from './dto/list-shops-query.dto';
 import { NearbyShopsQueryDto } from './dto/nearby-shops-query.dto';
 import { ShopNearbySummaryDto } from './dto/shop-nearby-summary.dto';
 import { UpdateShopDto } from './dto/update-shop.dto';
@@ -29,6 +30,18 @@ import { ShopsService } from './shops.service';
 @Controller('shops')
 export class ShopsController {
   constructor(private readonly shopsService: ShopsService) {}
+
+  @Get()
+  @ApiOperation({
+    summary: 'List active shops (paginated)',
+    description: 'Supports optional name search (`q`), `limit` (default 20, max 100), and `offset`.',
+  })
+  @ApiOkResponse({ description: '{ data: Shop[], total: number }' })
+  findAll(
+    @Query() query: ListShopsQueryDto,
+  ): Promise<{ data: Shop[]; total: number }> {
+    return this.shopsService.findAll(query.q, query.limit ?? 20, query.offset ?? 0);
+  }
 
   @Get('discover/nearby')
   @ApiOperation({

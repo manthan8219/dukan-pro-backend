@@ -75,6 +75,31 @@ export class ShopsService {
     return repo.save(shop);
   }
 
+  async findAll(
+    q?: string,
+    limit = 20,
+    offset = 0,
+  ): Promise<{ data: Shop[]; total: number }> {
+    const qb = this.shopsRepository
+      .createQueryBuilder('s')
+      .where('s.isDeleted = false AND s.isActive = true');
+
+    if (q?.trim()) {
+      qb.andWhere(
+        '(s.name ILIKE :q OR s.displayName ILIKE :q)',
+        { q: `%${q.trim()}%` },
+      );
+    }
+
+    const [data, total] = await qb
+      .orderBy('s.createdAt', 'DESC')
+      .limit(limit)
+      .offset(offset)
+      .getManyAndCount();
+
+    return { data, total };
+  }
+
   async findByUserId(userId: string): Promise<Shop[]> {
     await this.usersService.findOne(userId);
     return this.shopsRepository.find({
